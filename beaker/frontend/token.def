@@ -1,0 +1,54 @@
+
+// Defines a token.
+#ifndef def_token
+#  define def_token(K)
+#endif
+
+// Defines a token K having a single spelling S.
+#ifndef def_singleton
+#  define def_singleton(K, S) def_token(K)
+#endif
+
+// Defines a singleton K token whose spelling is also K. Keywords are a
+// subset of identifiers.
+#ifndef def_keyword
+#  define def_keyword(K) def_singleton(K, #K)
+#endif
+
+// Defines a token that has multiple spellings.
+#ifndef def_class
+#  define def_class(K) def_token(K)
+#endif
+
+def_singleton(eof, "")
+
+def_singleton(lparen, "(")
+def_singleton(rparen, ")")
+def_singleton(lbracket, "[")
+def_singleton(rbracket, "]")
+def_singleton(lbrace, "{")
+def_singleton(rbrace, "}")
+def_singleton(colon, ":")
+def_singleton(semicolon, ";")
+def_singleton(comma, ",")
+
+def_singleton(equal, "=")
+
+def_singleton(arrow, "->")
+
+def_keyword(bool)
+def_keyword(def)
+def_keyword(false)
+def_keyword(int)
+def_keyword(true)
+def_keyword(type)
+def_keyword(var)
+
+def_class(identifier)
+def_class(integer)
+def_class(invalid)
+
+#undef def_token
+#undef def_singleton
+#undef def_symbol
+#undef def_keyword
