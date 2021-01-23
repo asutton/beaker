@@ -198,12 +198,38 @@ namespace beaker
       return get_puncop<Token::semicolon_tok>(*this);
     case ',':
       return get_puncop<Token::comma_tok>(*this);
-    case '=':
-      return get_puncop<Token::equal_tok>(*this);
+    case '.':
+      return get_puncop<Token::dot_tok>(*this);
+    case '+':
+      return get_puncop<Token::plus_tok>(*this);
     case '-':
       if (nth_char_is(1, '>'))
         return get_puncop<Token::arrow_tok>(*this);
+      return get_puncop<Token::dash_tok>(*this);
+    case '*':
+      return get_puncop<Token::star_tok>(*this);
+    case '/':
+      return get_puncop<Token::slash_tok>(*this);
+    case '%':
+      return get_puncop<Token::percent_tok>(*this);
+    case '^':
+      return get_puncop<Token::caret_tok>(*this);
+    case '=':
+      if (nth_char_is(1, '='))
+        return get_puncop<Token::equal_equal_tok>(*this);
+      return get_puncop<Token::equal_tok>(*this);
+    case '!':
+      if (nth_char_is(1, '='))
+        return get_puncop<Token::bang_equal_tok>(*this);
       break;
+    case '<':
+      if (nth_char_is(1, '='))
+        return get_puncop<Token::less_equal_tok>(*this);
+      return get_puncop<Token::less_tok>(*this);
+    case '>':
+      if (nth_char_is(1, '='))
+        return get_puncop<Token::greater_equal_tok>(*this);
+      return get_puncop<Token::greater_tok>(*this);
     default:
       break;
     }

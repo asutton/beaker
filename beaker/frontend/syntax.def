@@ -1,0 +1,41 @@
+
+#ifndef def_tree
+#  define def_tree(K)
+#endif
+
+// Literal values and identifiers
+def_tree(literal)
+
+// User-defined names
+def_tree(identifier)
+
+// Lists, sequences, and enclosures
+def_tree(list)
+def_tree(seq)
+def_tree(enclosed)
+
+// Unary prefix operators (e.g., ^t)
+def_tree(prefix)
+
+// Compound type constructors
+def_tree(array)
+def_tree(func)
+def_tree(templ)
+
+// Unary postfix operators (e.g., e^)
+def_tree(postfix)
+
+// Compound postfix operators
+def_tree(call)
+def_tree(index)
+
+// Infix binary operators (e.g., x + y).
+def_tree(infix)
+
+// A triple of declarator, type, and definition.
+def_tree(decl)
+
+// Top-level
+def_tree(file)
+
+#undef def_tree

@@ -96,6 +96,15 @@ namespace beaker
       return {};
     }
 
+    /// If `pred(k)` is satisfied for the current lookahead, consume the token.
+    template<typename P>
+    Token match_if(P pred)
+    {
+      if (pred(lookahead()))
+        consume();
+      return {};
+    }
+
     /// Consume the next token if it has kind `k`, otherwise emit a diagnostic.
     Token expect(Token::Kind k)
     {
@@ -127,6 +136,12 @@ namespace beaker
 
     void parse_expression();
     void parse_implication_expression();
+    void parse_logical_or_expression();
+    void parse_logical_and_expression();
+    void parse_equality_expression();
+    void parse_relational_expression();
+    void parse_additive_expression();
+    void parse_multiplicative_expression();
     void parse_prefix_expression();
     void parse_postfix_expression();
     void parse_primary_expression();
@@ -137,10 +152,12 @@ namespace beaker
 
     void parse_paren_list();
     void parse_bracket_list();
+    void parse_expression_group();
     void parse_expression_list();
 
     // Diagnostics
 
+    void diagnose_expected(char const* what);
     void diagnose_expected(Token::Kind k);
 
     // Debugging
