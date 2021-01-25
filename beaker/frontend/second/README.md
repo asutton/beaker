@@ -1,5 +1,6 @@
 
-The grammar for this language is:
+The file extension for this language is `.bkr2`. The compiler can also be run
+with `-language second`. The grammar is:
 
 ```
 file:

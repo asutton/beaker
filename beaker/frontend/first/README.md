@@ -1,5 +1,7 @@
 
-The grammar for this language is:
+The file extension for this language is `.bkr` or `.bkr`. The compiler can
+also be run with `-language first`. The grammar is:
+
 
 ```
 file:
