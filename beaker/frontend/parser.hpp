@@ -9,6 +9,8 @@
 
 namespace beaker
 {
+  struct Syntax;
+
   /// Constructs a concrete syntax tree from a source file.
   struct Parser
   {
@@ -123,37 +125,37 @@ namespace beaker
 
     // Parsing
 
-    void parse_file();
+    Syntax* parse_file();
 
-    void parse_declaration_seq();
-    void parse_declaration();
-    void parse_definition();
-    void parse_parameter();
+    Syntax* parse_declaration_seq();
+    Syntax* parse_declaration();
+    Syntax* parse_definition();
+    Syntax* parse_parameter();
 
-    void parse_declarator();
+    Syntax* parse_declarator();
 
-    void parse_type();
+    Syntax* parse_type();
 
-    void parse_expression();
-    void parse_implication_expression();
-    void parse_logical_or_expression();
-    void parse_logical_and_expression();
-    void parse_equality_expression();
-    void parse_relational_expression();
-    void parse_additive_expression();
-    void parse_multiplicative_expression();
-    void parse_prefix_expression();
-    void parse_postfix_expression();
-    void parse_primary_expression();
-    void parse_tuple_expression();
-    void parse_list_expression();
-    void parse_id_expression();
-    void parse_parameter_expression();
+    Syntax* parse_expression();
+    Syntax* parse_implication_expression();
+    Syntax* parse_logical_or_expression();
+    Syntax* parse_logical_and_expression();
+    Syntax* parse_equality_expression();
+    Syntax* parse_relational_expression();
+    Syntax* parse_additive_expression();
+    Syntax* parse_multiplicative_expression();
+    Syntax* parse_prefix_expression();
+    Syntax* parse_postfix_expression();
+    Syntax* parse_primary_expression();
+    Syntax* parse_tuple_expression();
+    Syntax* parse_list_expression();
+    Syntax* parse_id_expression();
+    Syntax* parse_parameter_expression();
 
-    void parse_paren_list();
-    void parse_bracket_list();
-    void parse_expression_group();
-    void parse_expression_list();
+    Syntax* parse_paren_list();
+    Syntax* parse_bracket_list();
+    Syntax* parse_expression_group();
+    Syntax* parse_expression_list();
 
     // Diagnostics
 

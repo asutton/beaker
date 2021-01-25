@@ -1,41 +1,46 @@
 
-#ifndef def_tree
-#  define def_tree(K)
+// def_syntax(T, K)
+//
+// The two parameters are the class name and the kind name. The latter is
+// the same as the former, but lowercase.
+
+#ifndef def_syntax
+#  define def_syntax(T, K)
 #endif
 
 // Literal values and identifiers
-def_tree(literal)
+def_syntax(Literal, literal)
 
 // User-defined names
-def_tree(identifier)
+def_syntax(Identifier, identifier)
 
 // Lists, sequences, and enclosures
-def_tree(list)
-def_tree(seq)
-def_tree(enclosed)
+def_syntax(List, list)
+def_syntax(Sequence, sequence)
+def_syntax(Enclosure, enclosure)
 
 // Unary prefix operators (e.g., ^t)
-def_tree(prefix)
+def_syntax(Prefix, prefix)
 
 // Compound type constructors
-def_tree(array)
-def_tree(func)
-def_tree(templ)
+def_syntax(Array, array)
+def_syntax(Function, function)
+def_syntax(Template, template)
 
 // Unary postfix operators (e.g., e^)
-def_tree(postfix)
+def_syntax(Postfix, postfix)
 
 // Compound postfix operators
-def_tree(call)
-def_tree(index)
+def_syntax(Call, call)
+def_syntax(Index, index)
 
 // Infix binary operators (e.g., x + y).
-def_tree(infix)
+def_syntax(Infix, infix)
 
 // A triple of declarator, type, and definition.
-def_tree(decl)
+def_syntax(Declaration, declaration)
 
 // Top-level
-def_tree(file)
+def_syntax(File, file)
 
-#undef def_tree
+#undef def_syntax

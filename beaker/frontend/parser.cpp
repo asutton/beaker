@@ -1,5 +1,7 @@
 #include <beaker/frontend/parser.hpp>
 
+#include <beaker/frontend/syntax.hpp>
+
 #include <iostream>
 #include <sstream>
 
@@ -13,18 +15,34 @@ namespace beaker
     m_pos = 0;
   }
 
-  void Parser::parse_file()
+  Syntax* Parser::parse_file()
   {
-    parse_declaration_seq();
+    Syntax* s = parse_declaration_seq();
+    return new File_syntax(s);
   }
 
-  void Parser::parse_declaration_seq()
+  /// A helper function for parsing items in a list or sequence.
+  /// Accumulates the result in `ts`.
+  template<typename F>
+  static Syntax* parse_item(Parser& p, F fn, Syntax_seq& ss)
   {
+    // TODO: If we represent syntax errors explicitly, then
+    // the parser will always return a non-null pointer.
+    Syntax* s = (p.*fn)();
+    if (s)
+      ss.push_back(s);
+    return s;
+  }
+
+  Syntax* Parser::parse_declaration_seq()
+  {
+    Syntax_seq ss;
     while (!eof())
-      parse_declaration();
+      parse_item(*this, &Parser::parse_declaration, ss);
+    return new Sequence_syntax(std::move(ss));
   }
 
-  void Parser::parse_declaration()
+  Syntax* Parser::parse_declaration()
   {
     switch (lookahead()) {
     case Token::def_tok:
@@ -33,7 +51,11 @@ namespace beaker
       break;
     }
 
+    // FIXME: Return an error node. Also, how do we recover? We've got
+    // tokens not belonging to any particular declaration, so what would
+    // we skip to.
     diagnose_expected("declaration");
+    return nullptr;
   }
 
   /// Definition declaration:
@@ -42,31 +64,39 @@ namespace beaker
   ///     def declarator : type ;
   ///     def declarator : = expression ;
   ///     def declarator : type = expression ;
-  void Parser::parse_definition()
+  ///
+  /// TODO: Support brace initialization `def x : t { ... }`, although I'm
+  /// not sure what the grammar of `...` is. A sequence of statements? A
+  /// list of expressions. We can probably build a single grammar that supports
+  /// both.
+  Syntax* Parser::parse_definition()
   {
+    // TODO: Save tokens.
     require(Token::def_tok);
 
     // Parse the declarator
-    parse_declarator();
+    Syntax* decl = parse_declarator();
 
     // Parse the type.
     expect(Token::colon_tok);
     
+    Syntax* type = nullptr;
     if (next_token_is_not(Token::equal_tok)) {
-      parse_type();
+      type = parse_type();
 
       // Match the 'decl : type ;' case.
       if (match(Token::semicolon_tok))
-        return;
+        return new Declaration_syntax(decl, type, nullptr);
 
       // Fall through to parse the initializer.
     }
 
     // Parse the initializer.
     expect(Token::equal_tok);
-    parse_expression();
-    
+    Syntax* init = parse_expression();
     expect(Token::semicolon_tok);
+
+    return new Declaration_syntax(decl, type, init);
   }
 
   /// Parser a parameter:
@@ -76,33 +106,38 @@ namespace beaker
   ///   identifeir : = expression
   ///   : type
   ///   : type = expression
-  void Parser::parse_parameter()
+  Syntax* Parser::parse_parameter()
   {
     // Match unnamed variants.
     if (match(Token::colon_tok)) {
-      parse_type();
+      Syntax* type = parse_type();
+      Syntax* init = nullptr;
       if (match(Token::equal_tok))
-        parse_expression();
-      return;
+        init = parse_expression();
+      return new Declaration_syntax(nullptr, type, init);
     }
 
     // Match the identifier...
-    require(Token::identifier_tok);
+    Syntax* id = parse_id_expression();
     
     // ... And optional declarative information
+    Syntax* type = nullptr;
+    Syntax* init = nullptr;
     if (match(Token::colon_tok)) {
       if (next_token_is_not(Token::equal_tok))
-        parse_type();
+        type = parse_type();
       if (match(Token::equal_tok))
-        parse_expression();
+        init = parse_expression();
     }
+
+    return new Declaration_syntax(id, type, init);
   }
 
   /// Parse a declarator.
   ///
   ///   declarator:
   ///     postfix-expression
-  void Parser::parse_declarator()
+  Syntax* Parser::parse_declarator()
   {
     return parse_postfix_expression();
   }
@@ -111,7 +146,7 @@ namespace beaker
   ///
   ///   type-expression:
   ///     prefix-expression
-  void Parser::parse_type()
+  Syntax* Parser::parse_type()
   {
     return parse_prefix_expression();
   }
@@ -123,7 +158,7 @@ namespace beaker
   ///
   /// FIXME: Where do conditional expressions fit in? Lower or higher than
   /// implication? Or at the same precedence?
-  void Parser::parse_expression()
+  Syntax* Parser::parse_expression()
   {
     return parse_implication_expression();
   }
@@ -133,11 +168,14 @@ namespace beaker
   ///   implication-expression:
   ///     logical-or-expression
   ///     logical-or-expression -> implication-expression
-  void Parser::parse_implication_expression()
+  Syntax* Parser::parse_implication_expression()
   {
-    parse_prefix_expression();
-    if (match(Token::arrow_tok))
-      parse_implication_expression();
+    Syntax* e0 = parse_prefix_expression();
+    if (Token op = match(Token::arrow_tok)) {
+      Syntax* e1 = parse_implication_expression();
+      return new Infix_syntax(op, e0, e1);
+    }
+    return e0;
   }
 
   /// Parse an logical or.
@@ -145,11 +183,14 @@ namespace beaker
   ///   logical-or-expression:
   ///     logical-and-expression
   ///     logical-or-expression or logical-and-expression
-  void Parser::parse_logical_or_expression()
+  Syntax* Parser::parse_logical_or_expression()
   {
-    parse_logical_and_expression();
-    while (match(Token::or_tok))
-      parse_logical_and_expression();
+    Syntax* e0 = parse_logical_and_expression();
+    while (Token op = match(Token::or_tok)) {
+      Syntax* e1 = parse_logical_and_expression();
+      e0 = new Infix_syntax(op, e0, e1);
+    }
+    return e0;
   }
 
   /// Parse an logical and.
@@ -157,11 +198,14 @@ namespace beaker
   ///   logical-and-expression:
   ///     equality-expression
   ///     logical-and-expression and equality-expression
-  void Parser::parse_logical_and_expression()
+  Syntax* Parser::parse_logical_and_expression()
   {
-    parse_equality_expression();
-    while (match(Token::and_tok))
-      parse_equality_expression();
+    Syntax* e0 = parse_equality_expression();
+    while (Token op = match(Token::and_tok)) {
+      Syntax* e1 = parse_equality_expression();
+      e0 = new Infix_syntax(op, e0, e1);
+    }
+    return e0;
   }
 
   static bool is_equality_operator(Token::Kind k)
@@ -176,11 +220,14 @@ namespace beaker
   ///     relational-expression
   ///     equality-expression == relational-expression
   ///     equality-expression != relational-expression
-  void Parser::parse_equality_expression()
+  Syntax* Parser::parse_equality_expression()
   {
-    parse_relational_expression();
-    while (match_if(is_equality_operator))
-      parse_relational_expression();
+    Syntax* e0 = parse_relational_expression();
+    while (Token op = match_if(is_equality_operator)) {
+      Syntax* e1 = parse_relational_expression();
+      e0 = new Infix_syntax(op, e0, e1);
+    }
+    return e0;
   }
 
   static bool is_relational_operator(Token::Kind k)
@@ -199,11 +246,14 @@ namespace beaker
   ///     relational-expression > additive-expression
   ///     relational-expression <= additive-expression
   ///     relational-expression >= additive-expression
-  void Parser::parse_relational_expression()
+  Syntax* Parser::parse_relational_expression()
   {
-    parse_additive_expression();
-    while (match_if(is_relational_operator))
-      parse_additive_expression();
+    Syntax* e0 = parse_additive_expression();
+    while (Token op = match_if(is_relational_operator)) {
+      Syntax* e1 = parse_additive_expression();
+      e0 = new Infix_syntax(op, e0, e1);
+    }
+    return e0;
   }
 
   static bool is_additive_operator(Token::Kind k)
@@ -218,11 +268,14 @@ namespace beaker
   ///     multiplicative-expression
   ///     additive-expression < multiplicative-expression
   ///     additive-expression > multiplicative-expression
-  void Parser::parse_additive_expression()
+  Syntax* Parser::parse_additive_expression()
   {
-    parse_multiplicative_expression();
-    while (match_if(is_additive_operator))
-      parse_multiplicative_expression();
+    Syntax* e0 = parse_multiplicative_expression();
+    while (Token op = match_if(is_additive_operator)) {
+      Syntax* e1 = parse_multiplicative_expression();
+      e0 = new Infix_syntax(op, e0, e1);
+    }
+    return e0;
   }
 
   static bool is_multiplicative_operator(Token::Kind k)
@@ -238,11 +291,14 @@ namespace beaker
   ///     prefix-exprssion
   ///     multiplicative-expression < prefix-exprssion
   ///     multiplicative-expression > prefix-exprssion
-  void Parser::parse_multiplicative_expression()
+  Syntax* Parser::parse_multiplicative_expression()
   {
-    parse_prefix_expression();
-    while (match_if(is_multiplicative_operator))
-      parse_prefix_expression();
+    Syntax* e0 = parse_prefix_expression();
+    while (Token op = match_if(is_multiplicative_operator)) {
+      Syntax* e1 = parse_prefix_expression();
+      e0 = new Infix_syntax(op, e0, e1);
+    }
+    return e0;
   }
 
   /// Parse a prefix-expression.
@@ -273,31 +329,40 @@ namespace beaker
   /// we can't parse implications, unless we had some way of explicitly
   /// characterizing the leading parameter list as something other than a
   /// primary expression.
-  void Parser::parse_prefix_expression()
+  Syntax* Parser::parse_prefix_expression()
   {
+    // TODO: Save tokens for type constructors.
     switch (lookahead())
     {
-    case Token::array_tok:
-      consume();
-      parse_bracket_list();
-      return parse_prefix_expression();
+    case Token::array_tok: {
+      Token tok = consume();
+      Syntax* bound = parse_bracket_list();
+      Syntax* type = parse_prefix_expression();
+      return new Array_syntax(tok, bound, type);
+    }
 
-    case Token::templ_tok:
-      consume();
-      parse_bracket_list();
-      return parse_prefix_expression();
+    case Token::templ_tok: {
+      Token tok = consume();
+      Syntax* parms = parse_bracket_list();
+      Syntax* result = parse_prefix_expression();
+      return new Template_syntax(tok, parms, result);
+    }
 
-    case Token::func_tok:
-      consume();
-      parse_paren_list();
-      return parse_prefix_expression();
+    case Token::func_tok: {
+      Token tok = consume();
+      Syntax* parms = parse_paren_list();
+      Syntax* result = parse_prefix_expression();
+      return new Function_syntax(tok, parms, result);
+    }
 
     case Token::caret_tok:
     case Token::plus_tok:
     case Token::dash_tok:
-    case Token::not_tok:
-      consume();
-      return parse_prefix_expression();
+    case Token::not_tok: {
+      Token op = consume();
+      Syntax* e = parse_prefix_expression();
+      return new Prefix_syntax(op, e);
+    }
     
     default:
       break;
@@ -313,22 +378,30 @@ namespace beaker
   ///     postfix-expression [ expression-list ]
   ///     postfix-expression .
   ///     postfix-expression ^
-  void Parser::parse_postfix_expression()
+  Syntax* Parser::parse_postfix_expression()
   {
-    parse_primary_expression();
+    Syntax* e0 = parse_primary_expression();
     while (true)
     {
-      if (next_token_is(Token::lparen_tok))
-        parse_paren_list();
-      else if (next_token_is(Token::lbracket_tok))
-        parse_bracket_list();
-      else if (match(Token::dot_tok))
-        match(Token::identifier_tok);
-      else if (match(Token::caret_tok))
-        ;
+      if (next_token_is(Token::lparen_tok)) {
+        Syntax* args = parse_paren_list();
+        e0 = new Call_syntax(e0, args);
+      }
+      else if (next_token_is(Token::lbracket_tok)) {
+        Syntax* args = parse_bracket_list();
+        e0 = new Call_syntax(e0, args);
+      }
+      else if (Token dot = match(Token::dot_tok)) {
+        Syntax* member = parse_id_expression();
+        e0 = new Infix_syntax(dot, e0, member);
+      }
+      else if (Token op = match(Token::caret_tok)) {
+        e0 = new Postfix_syntax(op, e0);
+      }        
       else
-        return;
+        break;
     }
+    return e0;
   }
 
   /// Parse a primary expression.
@@ -339,22 +412,20 @@ namespace beaker
   ///     ( expression-list? )
   ///     [ expression-list? ]
   ///     id-expression
-  void Parser::parse_primary_expression()
+  Syntax* Parser::parse_primary_expression()
   {
     switch (lookahead()) {
+      // Value literals
     case Token::true_tok:
     case Token::false_tok:
     case Token::integer_tok:
-      // Value literals
-      consume();
-      return;
-
+    // Type literals
     case Token::int_tok:
     case Token::bool_tok:
-    case Token::type_tok:
-      // Type literals
-      consume();
-      return;
+    case Token::type_tok: {
+      Token value = consume();
+      return new Literal_syntax(value);
+    }
 
     case Token::identifier_tok:
       return parse_id_expression();
@@ -369,14 +440,19 @@ namespace beaker
       break;
     }
 
+    // FIXME: Return an error tree. Also, how can we recover from this?
+    // It might depend on what we're parsing (declarator, type, initialzer,
+    // etc.). To do that, we'd have to maintain a stack of recovery strategies
+    // that we can use to skip tokens.
     diagnose_expected("primary-expression");
+    return nullptr;
   }
 
   /// Parse a tuple-expression.
   ///
   ///   tuple-expression:
   ///     paren-list
-  void Parser::parse_tuple_expression()
+  Syntax* Parser::parse_tuple_expression()
   {
     return parse_paren_list();
   }
@@ -385,7 +461,7 @@ namespace beaker
   ///
   ///   list-expression:
   ///     paren-list
-  void Parser::parse_list_expression()
+  Syntax* Parser::parse_list_expression()
   {
     return parse_bracket_list();
   }
@@ -394,33 +470,85 @@ namespace beaker
   ///
   ///   id-expression:
   ///     identifier
-  void Parser::parse_id_expression()
+  Syntax* Parser::parse_id_expression()
   {
-    require(Token::identifier_tok);
+    Token id = expect(Token::identifier_tok);
+    return new Identifier_syntax(id);
+  }
+
+  enum class Enclosure
+  {
+    parens,
+    brackets,
+    braces,
+  };
+
+  struct Enclosing_tokens
+  {
+    Token::Kind open;
+    Token::Kind close;
+  };
+
+  static constexpr Enclosing_tokens enclosing_toks[] = {
+    { Token::lparen_tok, Token::rparen_tok },
+    { Token::lbracket_tok, Token::rbracket_tok },
+    { Token::lbrace_tok, Token::rbrace_tok },
+  };
+
+  static constexpr Token::Kind open_token(Enclosure e)
+  {
+    return enclosing_toks[(int)e].open;
+  }
+
+  static constexpr Token::Kind close_token(Enclosure e)
+  {
+    return enclosing_toks[(int)e].close;
+  }
+
+  /// Parse a list enclosed by the tokens of E. Note that a list
+  /// is comprised of groups, so that's allowed.
+  template<Enclosure E>
+  static Syntax* parse_enclosed_list(Parser& p)
+  {
+    Token open = p.require(open_token(E));
+    Syntax* t = nullptr;
+    if (p.next_token_is_not (Token::rparen_tok))
+      t = p.parse_expression_group();
+    Token close = p.match(close_token(E));
+    return new Enclosure_syntax(open, close, t);
   }
 
   /// Parse a paren-enclosed list.
   ///
   ///   paren-list:
   ///     ( expression-list? )
-  void Parser::parse_paren_list()
+  Syntax* Parser::parse_paren_list()
   {
-    require(Token::lparen_tok);
-    if (next_token_is_not (Token::rparen_tok))
-      parse_expression_group();
-    match(Token::rparen_tok);
+    return parse_enclosed_list<Enclosure::parens>(*this);
   }
 
   /// Parse a bracket-enclosed list.
   ///
   ///   bracket-list:
   ///     [ expression-list? ]
-  void Parser::parse_bracket_list()
+  Syntax* Parser::parse_bracket_list()
   {
-    require(Token::lbracket_tok);
-    if (next_token_is_not (Token::rbracket_tok))
-      parse_expression_group();
-    match(Token::rbracket_tok);
+    return parse_enclosed_list<Enclosure::brackets>(*this);
+  }
+
+  /// Returns a list defining the group.
+  static Syntax* make_group(std::vector<Syntax*>& ts)
+  {
+    // This only happens when there's an error and we can't accumulate
+    // a group. If we propagate errors, this shouldn't happen at all.
+    if (ts.empty())
+      return nullptr;    
+
+    // Don't allocate groups if there's only one present.    
+    if (ts.size() == 1)
+      return ts[0];
+
+    return new List_syntax(std::move(ts));
   }
 
   /// Parse an expression-group.
@@ -428,11 +556,25 @@ namespace beaker
   ///   expression-group:
   ///     expression-list
   ///     expression-group ; expression-list
-  void Parser::parse_expression_group()
+  ///
+  /// Groups are only created if multiple groups are present.
+  Syntax* Parser::parse_expression_group()
   {
-    parse_expression_list();
+    std::vector<Syntax*> ts;
+    parse_item(*this, &Parser::parse_expression_list, ts);
     while (match(Token::semicolon_tok))
-      parse_expression_group();
+      parse_item(*this, &Parser::parse_expression_list, ts);
+    return make_group(ts);
+  }
+
+  // Returns a list for `ts`.
+  static Syntax* make_list(std::vector<Syntax*>& ts)
+  {
+    // This only happens when an error occurred.
+    if (ts.empty())
+      return nullptr;
+
+    return new List_syntax(std::move(ts));
   }
 
   /// Parse an expression-list.
@@ -441,14 +583,14 @@ namespace beaker
   ///     parameter-expression
   ///     expression-list , parameter-expression
   ///
-  /// TODO: Allow groupings of the form: `a, b : int; c : char`. Basically,
-  /// just parse groups of things. These are ony valid when declaring
-  /// parameters.
-  void Parser::parse_expression_list()
+  /// This always returns a list, even if there's a single element.
+  Syntax* Parser::parse_expression_list()
   {
-    parse_parameter_expression();
+    std::vector<Syntax*> ts;
+    parse_item(*this, &Parser::parse_parameter_expression, ts);
     while (match(Token::comma_tok))
-      parse_parameter_expression();
+      parse_item(*this, &Parser::parse_parameter_expression, ts);
+    return make_list(ts);
   }
 
   static bool starts_parameter(Parser& p)
@@ -462,11 +604,14 @@ namespace beaker
   ///   parameter-expression:
   ///     parameter
   ///     expression
-  void Parser::parse_parameter_expression()
+  Syntax* Parser::parse_parameter_expression()
   {
+    // FIXME: Actually return things.
     if (starts_parameter(*this))
-      return parse_parameter();
-    parse_expression();
+      parse_parameter();
+    else
+      parse_expression();
+    return nullptr;
   }
 
   void Parser::diagnose_expected(char const* what)
@@ -480,11 +625,7 @@ namespace beaker
 
   void Parser::diagnose_expected(Token::Kind k)
   {
-    std::stringstream ss;
-    ss << input_location() << ": " 
-       << "expected '" << Token::spelling(k) 
-       << "' but got got '" << peek().spelling() << "'";
-    throw std::runtime_error(ss.str());
+    diagnose_expected(Token::spelling(k));
   }
 
   void Parser::debug(char const* msg)
