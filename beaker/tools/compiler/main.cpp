@@ -42,7 +42,7 @@ int main(int argc, char* argv[])
 
   Parser parser(trans, inputs[0]);
   Syntax* syn = parser.parse_file();
-  dump_syntax(syn);
+  syn->dump();
 
   return 0;
 }

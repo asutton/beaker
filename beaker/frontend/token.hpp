@@ -70,10 +70,16 @@ namespace beaker
       return m_sym.str();
     }
 
-    /// Returns the location of the error.
-    Source_location location() const
+    /// Returns the start location.
+    Source_location start_location() const
     {
       return m_loc;
+    }
+
+    // Returns the end location.
+    Source_location end_location() const
+    {
+      return {m_loc.line, m_loc.column + m_sym.size()};
     }
 
     Kind m_kind;

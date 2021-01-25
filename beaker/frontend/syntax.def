@@ -8,10 +8,8 @@
 #  define def_syntax(T, K)
 #endif
 
-// Literal values and identifiers
+// Atomic nodes
 def_syntax(Literal, literal)
-
-// User-defined names
 def_syntax(Identifier, identifier)
 
 // Lists, sequences, and enclosures
@@ -30,7 +28,7 @@ def_syntax(Template, template)
 // Unary postfix operators (e.g., e^)
 def_syntax(Postfix, postfix)
 
-// Compound postfix operators
+// Compound application operators
 def_syntax(Call, call)
 def_syntax(Index, index)
 

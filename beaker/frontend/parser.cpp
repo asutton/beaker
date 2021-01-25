@@ -71,8 +71,7 @@ namespace beaker
   /// both.
   Syntax* Parser::parse_definition()
   {
-    // TODO: Save tokens.
-    require(Token::def_tok);
+    Token intro = require(Token::def_tok);
 
     // Parse the declarator
     Syntax* decl = parse_declarator();
@@ -86,7 +85,7 @@ namespace beaker
 
       // Match the 'decl : type ;' case.
       if (match(Token::semicolon_tok))
-        return new Declaration_syntax(decl, type, nullptr);
+        return new Declaration_syntax(intro, decl, type, nullptr);
 
       // Fall through to parse the initializer.
     }
@@ -96,7 +95,7 @@ namespace beaker
     Syntax* init = parse_expression();
     expect(Token::semicolon_tok);
 
-    return new Declaration_syntax(decl, type, init);
+    return new Declaration_syntax(intro, decl, type, init);
   }
 
   /// Parser a parameter:
@@ -106,6 +105,10 @@ namespace beaker
   ///   identifeir : = expression
   ///   : type
   ///   : type = expression
+  ///
+  /// TODO: Can parameters have introducers?
+  ///
+  /// TODO: Can paramters be packs (yes, but what's the syntax?).
   Syntax* Parser::parse_parameter()
   {
     // Match unnamed variants.
@@ -114,7 +117,7 @@ namespace beaker
       Syntax* init = nullptr;
       if (match(Token::equal_tok))
         init = parse_expression();
-      return new Declaration_syntax(nullptr, type, init);
+      return new Declaration_syntax({}, nullptr, type, init);
     }
 
     // Match the identifier...
@@ -130,7 +133,7 @@ namespace beaker
         init = parse_expression();
     }
 
-    return new Declaration_syntax(id, type, init);
+    return new Declaration_syntax({}, id, type, init);
   }
 
   /// Parse a declarator.
@@ -593,6 +596,7 @@ namespace beaker
     return make_list(ts);
   }
 
+  /// Returns true if `p` starts a parameter declaration.
   static bool starts_parameter(Parser& p)
   {
     return p.next_token_is(Token::colon_tok) ||
@@ -606,12 +610,9 @@ namespace beaker
   ///     expression
   Syntax* Parser::parse_parameter_expression()
   {
-    // FIXME: Actually return things.
     if (starts_parameter(*this))
-      parse_parameter();
-    else
-      parse_expression();
-    return nullptr;
+      return parse_parameter();
+    return parse_expression();
   }
 
   void Parser::diagnose_expected(char const* what)

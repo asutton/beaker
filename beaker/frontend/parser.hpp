@@ -26,7 +26,7 @@ namespace beaker
 
     Source_location input_location()
     {
-      return peek().location();
+      return peek().start_location();
     }
 
     /// Peeks at the current token.
