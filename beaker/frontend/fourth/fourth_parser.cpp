@@ -47,6 +47,8 @@ namespace beaker
   ///   prefix-expression:
   ///     postfix-expression
   ///     const prefix-exprssion
+  ///     & prefix-expression
+  ///     * prefix-expression
   ///     - prefix-expression
   ///     + prefix-expression
   ///     not prefix-expression
@@ -55,6 +57,8 @@ namespace beaker
     switch (lookahead())
     {
     case Token::const_tok:
+    case Token::star_tok:
+    case Token::amper_tok:
     case Token::plus_tok:
     case Token::dash_tok:
     case Token::not_tok: {

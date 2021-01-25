@@ -211,6 +211,8 @@ namespace beaker
       return get_puncop<Token::slash_tok>(*this);
     case '%':
       return get_puncop<Token::percent_tok>(*this);
+    case '&':
+      return get_puncop<Token::amper_tok>(*this);
     case '^':
       return get_puncop<Token::caret_tok>(*this);
     case '=':

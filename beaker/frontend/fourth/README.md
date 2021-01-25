@@ -38,7 +38,7 @@ declarator:
     postfix-expression
 
 type-expression:
-    prefix-expression
+    implication-expression
 
 expression:
     infix-expression
@@ -82,11 +82,9 @@ multiplicative-expression:
 
 prefix-expression:
     postfix-expression
-    array [ expression-list? ] prefix-expression
-    templ [ expression-list? ] prefix-expression
-    func ( expression-list? ) prefix-expression
     const prefix-exprssion
-    ^ prefix-expression
+    * prefix-expression
+    & prefix-expression
     - prefix-expression
     + prefix-expression
     not prefix-expression
@@ -96,7 +94,6 @@ postfix-expression:
     postfix-expression ( expression-list )
     postfix-expression [ expression-list ]
     postfix-expression .
-    postfix-expression ^
 
 primary-expression:
     literal
@@ -104,6 +101,14 @@ primary-expression:
     ( expression-list? )
     [ expression-list? ]
     id-expression
+
+literal:
+    integer
+    int
+    bool
+    type
+    ptr
+    array
 
 tuple-expression:
     paren-list

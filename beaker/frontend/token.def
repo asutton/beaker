@@ -46,6 +46,7 @@ def_singleton(greater, ">")
 def_singleton(less_equal, "<=")
 def_singleton(greater_equal, ">=")
 
+def_singleton(amper, "&")
 def_singleton(caret, "^")
 
 def_singleton(equal, "=")
