@@ -1,6 +1,7 @@
 #include <beaker/frontend/syntax.hpp>
 #include <beaker/frontend/first/first_parser.hpp>
 #include <beaker/frontend/second/second_parser.hpp>
+#include <beaker/frontend/third/third_parser.hpp>
 #include <beaker/frontend/fourth/fourth_parser.hpp>
 
 #include <iostream>
@@ -15,6 +16,7 @@ enum Language
   default_lang,
   first_lang,   // extension .bkr and .bkr1
   second_lang,  // extension .bkr2
+  third_lang,   // extension .bkr3
   fourth_lang,  // extension .bkr4
 };
 
@@ -28,6 +30,8 @@ Language parse_language(int arg, int argc, char* argv[])
     return first_lang;
   if (lang == "second")
     return second_lang;
+  if (lang == "third")
+    return third_lang;
   if (lang == "fourth")
     return fourth_lang;
   throw std::runtime_error("invalid language");
@@ -41,6 +45,8 @@ Language infer_language(std::filesystem::path const& p)
     return first_lang;
   if (ext == ".bkr2")
     return second_lang;
+  if (ext == ".bkr3")
+    return third_lang;
   if (ext == ".bkr4")
     return fourth_lang;
   throw std::runtime_error("unknown language");
@@ -54,6 +60,8 @@ static std::unique_ptr<Parser> make_parser(Language lang, Translation& trans, st
     return std::make_unique<First_parser>(trans, p);
   case second_lang:
     return std::make_unique<Second_parser>(trans, p);
+  case third_lang:
+    return std::make_unique<Third_parser>(trans, p);
   case fourth_lang:
     return std::make_unique<Fourth_parser>(trans, p);
   default:

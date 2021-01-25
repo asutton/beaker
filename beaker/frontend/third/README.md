@@ -1,16 +1,12 @@
 
-The file extension for this language is `.bkr` or `.bkr`. The compiler can
-also be run with `-language first`.
+The file extension for this language is `.bkr3`. The compiler can also be run
+with `-language third`. The grammar is:
 
-Note that array syntax is kind overly verbose in this model. We don't get
-the nice bracketing that we'd have in C/C++.
-
-```
-def a : array[3, 4] int; # Ok
-def a : array[3] array[4] int; # Valid, but weird.
-```
-
-The full grammar is.
+This langauge requires neither an explicit prefix for unary type consructors,
+nor a suffix operand. However, the grammar for function type constructors
+requires explicit annotations for types (e.g., `(:int)`). We don't need to
+do this for array and template type constructors because there is no
+primary expression that starts with a `[`.
 
 ```
 file:
@@ -83,9 +79,8 @@ multiplicative-expression:
 
 prefix-expression:
     postfix-expression
-    array [ expression-list? ] prefix-expression
-    templ [ expression-group? ] prefix-expression
-    func ( expression-group? ) prefix-expression
+    [ expression-group? ] prefix-expression
+    ( parameter-group? ) prefix-expression
     const prefix-exprssion
     ^ prefix-expression
     - prefix-expression
@@ -94,8 +89,8 @@ prefix-expression:
 
 postfix-expression:
     primary-expression
-    postfix-expression ( expression-list )
-    postfix-expression [ expression-list ]
+    postfix-expression ( expression-list? )
+    postfix-expression [ expression-list? ]
     postfix-expression .
     postfix-expression ^
 
@@ -103,6 +98,12 @@ primary-expression:
     literal
     ( expression-list )
     id-expression
+
+literal:
+    integer
+    int
+    bool
+    type
 
 id-expression:
     identifier
@@ -113,9 +114,17 @@ expression-group:
 
 expression-list:
     parameter-expression
-    expression-list , parameter-or-expression
+    expression-list , parameter-expression
 
 parameter-or-expression:
     parameter
     expression
+
+parameter-group:
+    parameter-list
+    parameter-group ; parameter-list
+
+parameter-list:
+    parameter
+    parameter-list , parameter
 ``` 

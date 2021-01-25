@@ -4,6 +4,7 @@
 #include <beaker/language/translation.hpp>
 #include <beaker/frontend/lexer.hpp>
 #include <beaker/frontend/token.hpp>
+#include <beaker/frontend/syntax.hpp>
 
 #include <filesystem>
 
@@ -170,11 +171,70 @@ namespace beaker
 
     // Helper grammars
     Syntax* parse_paren_list();
+    Syntax* parse_paren_group();
     Syntax* parse_bracket_list();
+    Syntax* parse_bracket_group();
     Syntax* parse_expression_group();
     Syntax* parse_expression_list();
 
     Syntax* parse_parameter_or_expression();
+
+    // Generic parsers and utilities
+
+    /// A helper function for parsing items in a list or sequence.
+    /// Accumulates the result in `ts`.
+    template<typename P, typename F>
+    static Syntax* parse_item(P& parser, F fn, Syntax_seq& ss)
+    {
+      // TODO: If we represent syntax errors explicitly, then
+      // the parser will always return a non-null pointer.
+      Syntax* s = (parser.*fn)();
+      if (s)
+        ss.push_back(s);
+      return s;
+    }
+
+    enum class Enclosure
+    {
+      parens,
+      brackets,
+      braces,
+    };
+
+    struct Enclosing_tokens
+    {
+      Token::Kind open;
+      Token::Kind close;
+    };
+
+    static constexpr Enclosing_tokens enclosing_toks[] = {
+      { Token::lparen_tok, Token::rparen_tok },
+      { Token::lbracket_tok, Token::rbracket_tok },
+      { Token::lbrace_tok, Token::rbrace_tok },
+    };
+
+    static constexpr Token::Kind open_token(Enclosure e)
+    {
+      return enclosing_toks[(int)e].open;
+    }
+
+    static constexpr Token::Kind close_token(Enclosure e)
+    {
+      return enclosing_toks[(int)e].close;
+    }
+
+    /// Parse a list enclosed by the tokens of E. Note that a list
+    /// is comprised of groups, so that's allowed.
+    template<Enclosure E, typename F>
+    Syntax* parse_enclosed(F fn)
+    {
+      Token open = require(open_token(E));
+      Syntax* t = nullptr;
+      if (next_token_is_not(close_token(E)))
+        t = (this->*fn)();
+      Token close = expect(close_token(E));
+      return new Enclosure_syntax(open, close, t);
+    }
 
     // Diagnostics
 

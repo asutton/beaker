@@ -103,14 +103,12 @@ namespace beaker
     return e0;
   }
 
-
   /// Parse a primary expression.
   ///
   ///   primary-expression:
   ///     literal
-  ///     identifier
-  ///     ( expression-list? )
-  ///     [ expression-list? ]
+  ///     ( expression-group? )
+  ///     [ expression-group? ]
   ///     id-expression
   Syntax* Fourth_parser::parse_primary_expression()
   {
@@ -133,10 +131,10 @@ namespace beaker
       return parse_id_expression();
 
     case Token::lparen_tok:
-      return parse_tuple_expression();
+      return parse_paren_group();
 
     case Token::lbracket_tok:
-      return parse_list_expression();
+      return parse_bracket_group();
 
     default:
       break;

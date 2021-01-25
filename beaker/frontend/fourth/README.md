@@ -97,9 +97,8 @@ postfix-expression:
 
 primary-expression:
     literal
-    identifier
-    ( expression-list? )
-    [ expression-list? ]
+    ( expression-group? )
+    [ expression-group? ]
     id-expression
 
 literal:
@@ -110,20 +109,8 @@ literal:
     ptr
     array
 
-tuple-expression:
-    paren-list
-
-list-expression:
-    paren-list
-
 id-expression:
     identifier
-
-paren-list:
-    ( expression-list? )
-
-bracket-list:
-    [ expression-list? ]
 
 expression-group:
     expression-list
