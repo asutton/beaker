@@ -50,7 +50,8 @@ def_singleton(caret, "^")
 
 def_singleton(equal, "=")
 
-def_singleton(arrow, "->")
+def_singleton(dash_greater, "->")
+def_singleton(equal_greater, "=>")
 
 def_keyword(and)
 def_keyword(array)

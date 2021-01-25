@@ -219,9 +219,39 @@ namespace beaker
         : os(os)
       { }
 
-      void visit_atom(Atom_syntax const* s)
+      void visit_literal(Literal_syntax const* s)
       {
-        os << ' ' << s->spelling();
+        os << " value=" << s->spelling();
+      }
+
+      void visit_identifier(Identifier_syntax const* s)
+      {
+        os << " identifier=" << s->spelling();
+      }
+
+      void visit_prefix(Prefix_syntax const* s)
+      {
+        os << " operator=" << s->operation().spelling();
+      }
+
+      void visit_postfix(Postfix_syntax const* s)
+      {
+        os << " operator=" << s->operation().spelling();
+      }
+
+      void visit_infix(Infix_syntax const* s)
+      {
+        os << " operator=" << s->operation().spelling();
+      }
+
+      void visit_prefix(Constructor_syntax const* s)
+      {
+        os << " type=" << s->type().spelling();
+      }
+
+      void visit_enclosure(Enclosure_syntax const* s)
+      {
+        os << " kind=" << s->open().spelling() << s->close().spelling();
       }
 
       std::ostream& os;

@@ -184,7 +184,7 @@ namespace beaker
   Syntax* Parser::parse_implication_expression()
   {
     Syntax* e0 = parse_prefix_expression();
-    if (Token op = match(Token::arrow_tok)) {
+    if (Token op = match(Token::dash_greater_tok)) {
       Syntax* e1 = parse_implication_expression();
       return new Infix_syntax(op, e0, e1);
     }
@@ -344,7 +344,6 @@ namespace beaker
   /// primary expression.
   Syntax* Parser::parse_prefix_expression()
   {
-    // TODO: Save tokens for type constructors.
     switch (lookahead())
     {
     case Token::array_tok: {
@@ -527,7 +526,7 @@ namespace beaker
     Syntax* t = nullptr;
     if (p.next_token_is_not (Token::rparen_tok))
       t = p.parse_expression_group();
-    Token close = p.match(close_token(E));
+    Token close = p.expect(close_token(E));
     return new Enclosure_syntax(open, close, t);
   }
 

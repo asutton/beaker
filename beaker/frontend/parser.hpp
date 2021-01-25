@@ -106,7 +106,7 @@ namespace beaker
     Token match_if(P pred)
     {
       if (pred(lookahead()))
-        consume();
+        return consume();
       return {};
     }
 

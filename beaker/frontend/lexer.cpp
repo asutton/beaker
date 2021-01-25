@@ -165,7 +165,6 @@ namespace beaker
     return Token(K, sym, loc);
   }
 
-
   template<Token::Kind K>
   static Token get_puncop(Scanner& s)
   {
@@ -204,7 +203,7 @@ namespace beaker
       return get_puncop<Token::plus_tok>(*this);
     case '-':
       if (nth_char_is(1, '>'))
-        return get_puncop<Token::arrow_tok>(*this);
+        return get_puncop<Token::dash_greater_tok>(*this);
       return get_puncop<Token::dash_tok>(*this);
     case '*':
       return get_puncop<Token::star_tok>(*this);
@@ -215,6 +214,8 @@ namespace beaker
     case '^':
       return get_puncop<Token::caret_tok>(*this);
     case '=':
+      if (nth_char_is(1, '>'))
+        return get_puncop<Token::equal_greater_tok>(*this);
       if (nth_char_is(1, '='))
         return get_puncop<Token::equal_equal_tok>(*this);
       return get_puncop<Token::equal_tok>(*this);
