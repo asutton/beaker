@@ -367,6 +367,7 @@ namespace beaker
       return new Function_syntax(tok, parms, result);
     }
 
+    case Token::const_tok:
     case Token::caret_tok:
     case Token::plus_tok:
     case Token::dash_tok:
@@ -388,7 +389,7 @@ namespace beaker
   ///     primary-expression
   ///     postfix-expression ( expression-list )
   ///     postfix-expression [ expression-list ]
-  ///     postfix-expression .
+  ///     postfix-expression . id-expression
   ///     postfix-expression ^
   Syntax* Parser::parse_postfix_expression()
   {

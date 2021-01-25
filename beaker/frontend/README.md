@@ -37,6 +37,32 @@ The parsers are as follows:
   The type notion is more mathematically common, but requires infinite lookahead
   to disambiguate prefix operators.
 
+- **third**. Like first and second, but tries to eliminate all punctuation
+  before and after prefix operators. To make this unambiguous, mapping types
+  must use an explicit "type" annotation as part of their type list.
+
+  ```
+  f(x:int) : int;
+  f : (:int) int; # (:int) is a type constructor, but (int) is a
+                  # primary expression
+  ```
+
+- **third**. Quite a bit different. This language abandons trying to find
+  left-to-right notation for non-mapping types. Mapping types are defined by
+  implication operators, and all other types are postfix expressions. Pointers
+  and arrays are written as `ptr[t]` and `array[t]` respectively. In the array
+  case, the bounds are applied after the type constructor. 
+
+  ```
+  f(x:int) : int;
+  f : (int) -> int;
+  p : ptr[int];
+  a : array[int][3][4];
+  ```
+
+  Note that this language reverts dereferencing to its conventional prefix
+  position, like C/C++.
+
 General observations follow:
 
 Any token used as postfix operator cannot also be an infix operator. This means

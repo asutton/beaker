@@ -1,6 +1,7 @@
 #include <beaker/frontend/syntax.hpp>
 #include <beaker/frontend/first/first_parser.hpp>
 #include <beaker/frontend/second/second_parser.hpp>
+#include <beaker/frontend/fourth/fourth_parser.hpp>
 
 #include <iostream>
 #include <filesystem>
@@ -14,6 +15,7 @@ enum Language
   default_lang,
   first_lang,   // extension .bkr and .bkr1
   second_lang,  // extension .bkr2
+  fourth_lang,  // extension .bkr4
 };
 
 // Parse the value of the -language flag.
@@ -26,6 +28,8 @@ Language parse_language(int arg, int argc, char* argv[])
     return first_lang;
   if (lang == "second")
     return second_lang;
+  if (lang == "fourth")
+    return fourth_lang;
   throw std::runtime_error("invalid language");
 }
 
@@ -37,7 +41,9 @@ Language infer_language(std::filesystem::path const& p)
     return first_lang;
   if (ext == ".bkr2")
     return second_lang;
-  return default_lang;
+  if (ext == ".bkr4")
+    return fourth_lang;
+  throw std::runtime_error("unknown language");
 }
 
 static std::unique_ptr<Parser> make_parser(Language lang, Translation& trans, std::filesystem::path const& p)
@@ -48,6 +54,8 @@ static std::unique_ptr<Parser> make_parser(Language lang, Translation& trans, st
     return std::make_unique<First_parser>(trans, p);
   case second_lang:
     return std::make_unique<Second_parser>(trans, p);
+  case fourth_lang:
+    return std::make_unique<Fourth_parser>(trans, p);
   default:
     assert(false);
   }
@@ -55,7 +63,6 @@ static std::unique_ptr<Parser> make_parser(Language lang, Translation& trans, st
 
 int main(int argc, char* argv[])
 {
-
   if (argc == 1)
     throw std::runtime_error("usage error");
 

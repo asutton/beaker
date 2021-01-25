@@ -6,5 +6,6 @@ add_library(beaker-frontend STATIC
   lexer.cpp
   parser.cpp
   first/first_parser.cpp
-  second/second_parser.cpp)
+  second/second_parser.cpp
+  fourth/fourth_parser.cpp)
 target_link_libraries(beaker-frontend PUBLIC beaker-language)

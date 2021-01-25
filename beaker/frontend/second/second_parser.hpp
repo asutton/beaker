@@ -6,9 +6,6 @@
 namespace beaker
 {
   /// Constructs a concrete syntax tree from a source file.
-  ///
-  /// This language simply inherits the grammar of the "root" parser. It
-  /// doesn't change any of the syntax.
   struct Second_parser : Parser
   {
     using Parser::Parser;

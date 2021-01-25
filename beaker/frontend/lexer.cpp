@@ -139,7 +139,7 @@ namespace beaker
       ++iter;
     Symbol sym = m_lex.m_trans.get_symbol(m_first, iter);
     Source_location loc = m_lex.input_location();
-    return Token(Token::identifier_tok, sym, loc);
+    return Token(Token::integer_tok, sym, loc);
   }
 
   // Returns

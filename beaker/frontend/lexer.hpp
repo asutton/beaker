@@ -11,6 +11,11 @@ namespace beaker
   struct Lexer;
 
   /// The base class of all scanners used by the lexer.
+  ///
+  /// FIXME: Different languages have different keywords. We need to make
+  /// sure the keyword table is initialized appopriately. Different languages
+  /// may also have different tokens, which could be a bit harder to specify.
+  /// For now, everything just gets shared.
   struct Scanner
   {
     Scanner(Lexer& lex, char const* first, char const* last)

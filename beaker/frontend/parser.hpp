@@ -148,7 +148,7 @@ namespace beaker
     
     // Infix expressions.
     virtual Syntax* parse_infix_expression();
-    Syntax* parse_implication_expression();
+    virtual Syntax* parse_implication_expression();
     Syntax* parse_logical_or_expression();
     Syntax* parse_logical_and_expression();
     Syntax* parse_equality_expression();
