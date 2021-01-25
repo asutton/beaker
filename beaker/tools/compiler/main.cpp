@@ -1,5 +1,5 @@
-#include <beaker/frontend/parser.hpp>
 #include <beaker/frontend/syntax.hpp>
+#include <beaker/frontend/first/first_parser.hpp>
 
 #include <iostream>
 #include <filesystem>
@@ -40,7 +40,7 @@ int main(int argc, char* argv[])
   using namespace beaker;
   Translation trans;
 
-  Parser parser(trans, inputs[0]);
+  First_parser parser(trans, inputs[0]);
   Syntax* syn = parser.parse_file();
   syn->dump();
 

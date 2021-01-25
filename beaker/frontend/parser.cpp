@@ -100,11 +100,12 @@ namespace beaker
 
   /// Parser a parameter:
   ///
-  ///   identifier : type
-  ///   identifier : type = expression
-  ///   identifeir : = expression
-  ///   : type
-  ///   : type = expression
+  ///   parameter:
+  ///     identifier : type
+  ///     identifier : type = expression
+  ///     identifeir : = expression
+  ///     : type
+  ///     : type = expression
   ///
   /// TODO: Can parameters have introducers?
   ///
@@ -157,11 +158,20 @@ namespace beaker
   /// Parse an expression.
   ///
   ///   expression:
-  ///     impliciation-expression
+  ///     infix-expression
   ///
   /// FIXME: Where do conditional expressions fit in? Lower or higher than
   /// implication? Or at the same precedence?
   Syntax* Parser::parse_expression()
+  {
+    return parse_infix_expression();
+  }
+
+  /// Parse an expression.
+  ///
+  ///   infix-expression:
+  ///     implication-expression
+  Syntax* Parser::parse_infix_expression()
   {
     return parse_implication_expression();
   }
@@ -590,9 +600,9 @@ namespace beaker
   Syntax* Parser::parse_expression_list()
   {
     std::vector<Syntax*> ts;
-    parse_item(*this, &Parser::parse_parameter_expression, ts);
+    parse_item(*this, &Parser::parse_parameter_or_expression, ts);
     while (match(Token::comma_tok))
-      parse_item(*this, &Parser::parse_parameter_expression, ts);
+      parse_item(*this, &Parser::parse_parameter_or_expression, ts);
     return make_list(ts);
   }
 
@@ -608,7 +618,7 @@ namespace beaker
   ///   parameter-expression:
   ///     parameter
   ///     expression
-  Syntax* Parser::parse_parameter_expression()
+  Syntax* Parser::parse_parameter_or_expression()
   {
     if (starts_parameter(*this))
       return parse_parameter();

@@ -11,7 +11,10 @@ namespace beaker
 {
   struct Syntax;
 
-  /// Constructs a concrete syntax tree from a source file.
+  /// Constructs a concrete syntax tree from a source file. This is the
+  /// base class of experimental language parsers. The "main" entry point
+  /// to various syntactic forms are defined as virtual functions to be
+  /// overridden for various experiments.
   struct Parser
   {
     Parser(Translation& trans, std::filesystem::path const& p);
@@ -125,18 +128,26 @@ namespace beaker
 
     // Parsing
 
-    Syntax* parse_file();
+    // Top-level.
+    virtual Syntax* parse_file();
 
-    Syntax* parse_declaration_seq();
-    Syntax* parse_declaration();
+    // Declarations.
+    virtual Syntax* parse_declaration();
     Syntax* parse_definition();
     Syntax* parse_parameter();
+    Syntax* parse_declaration_seq();
 
-    Syntax* parse_declarator();
+    // Declarators.
+    virtual Syntax* parse_declarator();
 
-    Syntax* parse_type();
+    // Types.
+    virtual Syntax* parse_type();
 
-    Syntax* parse_expression();
+    // Expressions, in general.
+    virtual Syntax* parse_expression();
+    
+    // Infix expressions.
+    virtual Syntax* parse_infix_expression();
     Syntax* parse_implication_expression();
     Syntax* parse_logical_or_expression();
     Syntax* parse_logical_and_expression();
@@ -144,18 +155,26 @@ namespace beaker
     Syntax* parse_relational_expression();
     Syntax* parse_additive_expression();
     Syntax* parse_multiplicative_expression();
-    Syntax* parse_prefix_expression();
-    Syntax* parse_postfix_expression();
-    Syntax* parse_primary_expression();
+    
+    // Prefix expressions.
+    virtual Syntax* parse_prefix_expression();
+    
+    // Postfix expressions.
+    virtual Syntax* parse_postfix_expression();
+    
+    // Primary expressions.
+    virtual Syntax* parse_primary_expression();
     Syntax* parse_tuple_expression();
     Syntax* parse_list_expression();
     Syntax* parse_id_expression();
-    Syntax* parse_parameter_expression();
 
+    // Helper grammars
     Syntax* parse_paren_list();
     Syntax* parse_bracket_list();
     Syntax* parse_expression_group();
     Syntax* parse_expression_list();
+
+    Syntax* parse_parameter_or_expression();
 
     // Diagnostics
 
