@@ -33,7 +33,7 @@ type-clause;
 
 initializer-clause:
     = expression ;
-    { statement-list }
+    { statement-seq }
 
 parameter:
     identifier : type
@@ -134,7 +134,11 @@ parameter-or-expression:
     parameter
     expression
 
-statement-list
+statement-seq
     statement
-    statement-list statement
+    statement-seq statement
+
+statement:
+    declaration-statement
+    expression-statement
 ``` 
