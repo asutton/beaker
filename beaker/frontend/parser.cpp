@@ -187,11 +187,22 @@ namespace beaker
   ///
   ///   expression:
   ///     infix-expression
+  ///     return infix-expression
+  ///     yield infix-expression
+  ///     throw infix-expression
   ///
-  /// FIXME: Where do conditional expressions fit in? Lower or higher than
-  /// implication? Or at the same precedence?
+  /// TODO: Actually implement throw and yield.
   Syntax* Parser::parse_expression()
   {
+    switch (lookahead()) {
+    case Token::return_tok: {
+      Token tok = consume();
+      Syntax* e = parse_infix_expression();
+      return new Prefix_syntax(tok, e);
+    }
+    default:
+      break;
+    }
     return parse_infix_expression();
   }
 
@@ -655,6 +666,7 @@ namespace beaker
   ///
   ///   statement:
   ///     declaration-statement
+  ///     return-statement
   ///     expression-statement
   Syntax* Parser::parse_statement(std::size_t n)
   {

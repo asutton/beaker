@@ -117,6 +117,7 @@ postfix-expression:
 primary-expression:
     literal
     ( expression-list )
+    { statement-seq? }
     id-expression
 
 id-expression:

@@ -44,7 +44,11 @@ expression:
     infix-expression
 
 infix-expression:
+    assignment-expression:
+
+assignment-expression:
     implication-expression
+    implication-expression = assignment-expression
 
 implication-expression:
     logical-or-expression
@@ -99,6 +103,7 @@ primary-expression:
     literal
     ( expression-group? )
     [ expression-group? ]
+    { statement-seq? }
     id-expression
 
 literal:
@@ -123,4 +128,12 @@ expression-list:
 parameter-or-expression:
     parameter
     expression
+
+statement-seq
+    statement
+    statement-seq statement
+
+statement:
+    declaration-statement
+    expression-statement
 ``` 

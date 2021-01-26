@@ -136,6 +136,9 @@ namespace beaker
     case Token::lbracket_tok:
       return parse_bracket_group();
 
+    case Token::lbrace_tok:
+      return parse_brace_list();
+
     default:
       break;
     }
