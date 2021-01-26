@@ -47,7 +47,7 @@ The parsers are as follows:
                   # primary expression
   ```
 
-- **third**. Quite a bit different. This language abandons trying to find
+- **fourth**. Quite a bit different. This language abandons trying to find
   left-to-right notation for non-mapping types. Mapping types are defined by
   implication operators, and all other types are postfix expressions. Pointers
   and arrays are written as `ptr[t]` and `array[t]` respectively. In the array
