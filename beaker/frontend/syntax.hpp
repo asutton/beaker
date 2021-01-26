@@ -17,8 +17,8 @@ namespace beaker
   {
     enum Kind
     {
-#define def_syntax(T, K) \
-      K ## _kind,
+#define def_syntax(T, B) \
+      T,
 #include <beaker/frontend/syntax.def>
     };
 
@@ -34,9 +34,6 @@ namespace beaker
 
     /// Returns the kind name.
     char const* kind_name() const;
-
-    /// Returns the class name.
-    char const* class_name() const;
 
     /// Returns a span over the children of this node.
     std::span<Syntax const* const> children() const;
@@ -241,7 +238,7 @@ namespace beaker
   /// Represents literal values.
   struct Literal_syntax : Atom_syntax
   {
-    static constexpr Kind this_kind = literal_kind;
+    static constexpr Kind this_kind = Literal;
 
     Literal_syntax(Token tok)
       : Atom_syntax(this_kind, tok)
@@ -251,7 +248,7 @@ namespace beaker
   /// Represents user-defined names.
   struct Identifier_syntax : Atom_syntax
   {
-    static constexpr Kind this_kind = identifier_kind;
+    static constexpr Kind this_kind = Identifier;
 
     Identifier_syntax(Token tok)
       : Atom_syntax(this_kind, tok)
@@ -264,7 +261,7 @@ namespace beaker
   /// actually important.
   struct List_syntax : Multiary_syntax
   {
-    static constexpr Kind this_kind = list_kind;
+    static constexpr Kind this_kind = List;
 
     List_syntax(Syntax_seq const& s)
       : Multiary_syntax(this_kind, s)
@@ -278,7 +275,7 @@ namespace beaker
   /// A sequence of terms.
   struct Sequence_syntax : Multiary_syntax
   {
-    static constexpr Kind this_kind = sequence_kind;
+    static constexpr Kind this_kind = Sequence;
 
     Sequence_syntax(Syntax_seq const& s)
       : Multiary_syntax(this_kind, s)
@@ -292,7 +289,7 @@ namespace beaker
   /// A term enclosed by a pair of tokens.
   struct Enclosure_syntax : Unary_syntax
   {
-    static constexpr Kind this_kind = enclosure_kind;
+    static constexpr Kind this_kind = Enclosure;
 
     Enclosure_syntax(Token o, Token c, Syntax* t)
       : Unary_syntax(this_kind, t), m_open(o), m_close(c)
@@ -323,7 +320,7 @@ namespace beaker
   /// A unary prefix operator expression.
   struct Prefix_syntax : Unary_syntax
   {
-    static constexpr Kind this_kind = prefix_kind;
+    static constexpr Kind this_kind = Prefix;
 
     Prefix_syntax(Token tok, Syntax* s)
       : Unary_syntax(this_kind, s), m_op(tok)
@@ -370,7 +367,7 @@ namespace beaker
   /// Array type constructor.
   struct Array_syntax : Constructor_syntax
   {
-    static constexpr Kind this_kind = array_kind;
+    static constexpr Kind this_kind = Array;
 
     Array_syntax(Token tok, Syntax* s, Syntax* t)
       : Constructor_syntax(this_kind, tok, s, t)
@@ -402,7 +399,7 @@ namespace beaker
   /// Function type constructor.
   struct Function_syntax : Mapping_syntax
   {
-    static constexpr Kind this_kind = function_kind;
+    static constexpr Kind this_kind = Function;
 
     Function_syntax(Token tok, Syntax* p, Syntax* r)
       : Mapping_syntax(this_kind, tok, p, r)
@@ -412,7 +409,7 @@ namespace beaker
   /// Template type constructor.
   struct Template_syntax : Mapping_syntax
   {
-    static constexpr Kind this_kind = template_kind;
+    static constexpr Kind this_kind = Template;
 
     Template_syntax(Token tok, Syntax* p, Syntax* r)
       : Mapping_syntax(this_kind, tok, p, r)
@@ -426,9 +423,12 @@ namespace beaker
   ///
   /// TODO: If I decide to keep this syntax, it should replace the constructor
   /// syntax above, which has all the good names.
+  ///
+  /// TODO: Also, this should really be a base class of the constructor
+  /// syntax, but also a concrete node in its own right.
   struct Introduction_syntax : Constructor_syntax
   {
-    static constexpr Kind this_kind = introduction_kind;
+    static constexpr Kind this_kind = Introduction;
 
     Introduction_syntax(Syntax* s, Syntax* t)
       : Constructor_syntax(this_kind, {}, s, t)
@@ -446,7 +446,7 @@ namespace beaker
   /// Unary postfix operators.
   struct Postfix_syntax : Unary_syntax
   {
-    static constexpr Kind this_kind = postfix_kind;
+    static constexpr Kind this_kind = Postfix;
 
     Postfix_syntax(Token tok, Syntax* s)
       : Unary_syntax(this_kind, s), m_op(tok)
@@ -484,7 +484,7 @@ namespace beaker
   /// Represents a function call.
   struct Call_syntax : Application_syntax
   {
-    static constexpr Kind this_kind = call_kind;
+    static constexpr Kind this_kind = Call;
 
     Call_syntax(Syntax* s0, Syntax* s1)
       : Application_syntax(this_kind, s0, s1)
@@ -494,7 +494,7 @@ namespace beaker
   /// Represents indexing into a table.
   struct Index_syntax : Application_syntax
   {
-    static constexpr Kind this_kind = index_kind;
+    static constexpr Kind this_kind = Index;
 
     Index_syntax(Syntax* s0, Syntax* s1)
       : Application_syntax(this_kind, s0, s1)
@@ -504,7 +504,7 @@ namespace beaker
   /// Infix binary operators.
   struct Infix_syntax : Binary_syntax
   {
-    static constexpr Kind this_kind = infix_kind;
+    static constexpr Kind this_kind = Infix;
 
     Infix_syntax(Token t, Syntax* l, Syntax* r)
       : Binary_syntax(this_kind, l, r), m_op(t)
@@ -534,7 +534,7 @@ namespace beaker
   /// A declaration.
   struct Declaration_syntax : Ternary_syntax
   {
-    static constexpr Kind this_kind = declaration_kind;
+    static constexpr Kind this_kind = Declaration;
 
     Declaration_syntax(Token tok, Syntax* d, Syntax* t, Syntax* i)
       : Ternary_syntax(this_kind, d, t, i), m_tok(tok)
@@ -570,7 +570,7 @@ namespace beaker
   /// The top-level container of terms.
   struct File_syntax : Unary_syntax
   {
-    static constexpr Kind this_kind = file_kind;
+    static constexpr Kind this_kind = File;
 
     File_syntax(Syntax* ds)
       : Unary_syntax(this_kind, ds)
@@ -621,139 +621,30 @@ namespace beaker
     }
 
     // By default, returns a default-constructed `R`.
-    R visit_syntax(Ptr<Syntax> s, Parms... parms)
+    R visit_Syntax(Ptr<Syntax> s, Parms... parms)
     {
       return R();
     }
 
     // Visit syntax of the particular kind. This includes visitors for
     // non-leaf bases (e.g., vector, constructor, and application).
-    //
-    // TODO: Automating the formation of this table would be great.
 
-    R visit_unary(Ptr<Unary_syntax> s, Parms... parms)
-    {
-      return derived()->visit_syntax(s, parms...);
+#define def_syntax(T, B) \
+    R visit_## T(Ptr<T ## _syntax> s, Parms... parms) \
+    { \
+      return derived()->visit_ ## B(s, parms...); \
     }
-
-    R visit_binary(Ptr<Binary_syntax> s, Parms... parms)
-    {
-      return derived()->visit_syntax(s, parms...);
-    }
-
-    R visit_ternary(Ptr<Ternary_syntax> s, Parms... parms)
-    {
-      return derived()->visit_syntax(s, parms...);
-    }
-
-    R visit_multiary(Ptr<Multiary_syntax> s, Parms... parms)
-    {
-      return derived()->visit_syntax(s, parms...);
-    }
-
-    R visit_atom(Ptr<Atom_syntax> s, Parms... parms)
-    {
-      return derived()->visit_syntax(s, parms...);
-    }
-
-    R visit_literal(Ptr<Literal_syntax> s, Parms... parms)
-    {
-      return derived()->visit_atom(s, parms...);
-    }
-
-    R visit_identifier(Ptr<Identifier_syntax> s, Parms... parms)
-    {
-      return derived()->visit_atom(s, parms...);
-    }
-
-    R visit_list(Ptr<List_syntax> s, Parms... parms)
-    {
-      return derived()->visit_multiary(s, parms...);
-    }
-
-    R visit_sequence(Ptr<Sequence_syntax> s, Parms... parms)
-    {
-      return derived()->visit_multiary(s, parms...);
-    }
-
-    R visit_enclosure(Ptr<Enclosure_syntax> s, Parms... parms)
-    {
-      return derived()->visit_unary(s, parms...);
-    }
-
-    R visit_prefix(Ptr<Prefix_syntax> s, Parms... parms)
-    {
-      return derived()->visit_unary(s, parms...);
-    }
-
-    R visit_constructor(Ptr<Constructor_syntax> s, Parms... parms)
-    {
-      return derived()->visit_binary(s, parms...);
-    }
-
-    R visit_array(Ptr<Array_syntax> s, Parms... parms)
-    {
-      return derived()->visit_constructor(s, parms...);
-    }
-
-    R visit_function(Ptr<Function_syntax> s, Parms... parms)
-    {
-      return derived()->visit_constructor(s, parms...);
-    }
-
-    R visit_template(Ptr<Template_syntax> s, Parms... parms)
-    {
-      return derived()->visit_constructor(s, parms...);
-    }
-
-    R visit_introduction(Ptr<Introduction_syntax> s, Parms... parms)
-    {
-      return derived()->visit_constructor(s, parms...);
-    }
-
-    R visit_postfix(Ptr<Postfix_syntax> s, Parms... parms)
-    {
-      return derived()->visit_unary(s, parms...);
-    }
-
-    R visit_application(Ptr<Application_syntax> s, Parms... parms)
-    {
-      return derived()->visit_binary(s, parms...);
-    }
-
-    R visit_call(Ptr<Call_syntax> s, Parms... parms)
-    {
-      return derived()->visit_application(s, parms...);
-    }
-
-    R visit_index(Ptr<Index_syntax> s, Parms... parms)
-    {
-      return derived()->visit_application(s, parms...);
-    }
-
-    R visit_infix(Ptr<Infix_syntax> s, Parms... parms)
-    {
-      return derived()->visit_binary(s, parms...);
-    }
-
-    R visit_declaration(Ptr<Declaration_syntax> s, Parms... parms)
-    {
-      return derived()->visit_ternary(s, parms...);
-    }
-
-    R visit_file(Ptr<File_syntax> s, Parms... parms)
-    {
-      return derived()->visit_unary(s, parms...);
-    }
+#define def_abstract(T, B) def_syntax(T, B)
+#include <beaker/frontend/syntax.def>
 
     // Dispatch to one of the functions above.
     R visit(Ptr<Syntax> s, Parms... parms)
     {
       assert(s);
       switch (s->kind()) {
-#define def_syntax(T, K) \
-      case Syntax::K ## _kind: \
-        return derived()->visit_ ## K(static_cast<Ptr<T ## _syntax>>(s), parms...);
+#define def_syntax(T, B) \
+      case Syntax::T: \
+        return derived()->visit_ ## T(static_cast<Ptr<T ## _syntax>>(s), parms...);
 #include <beaker/frontend/syntax.def>
       default:
         break;

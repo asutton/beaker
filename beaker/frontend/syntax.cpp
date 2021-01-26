@@ -9,22 +9,8 @@ namespace beaker
   char const* Syntax::kind_name() const
   {
     switch (m_kind) {
-#define def_syntax(T, K) \
-    case K ## _kind: \
-      return #K;
-#include <beaker/frontend/syntax.def>
-    default:
-      break;
-    }
-    assert(false);
-  }
-
-  /// Returns the class name.
-  char const* Syntax::class_name() const
-  {
-    switch (m_kind) {
-#define def_syntax(T, K) \
-    case K ## _kind: \
+#define def_syntax(T, B) \
+    case T: \
       return #T;
 #include <beaker/frontend/syntax.def>
     default:
@@ -47,27 +33,27 @@ namespace beaker
       template<typename T>
       using Ptr = Base::template Ptr<T>;
       
-      R visit_atom(Ptr<Atom_syntax> s)
+      R visit_Atom(Ptr<Atom_syntax> s)
       {
         return {};
       }
 
-      R visit_unary(Ptr<Unary_syntax> s)
+      R visit_Unary(Ptr<Unary_syntax> s)
       {
         return s->operands();
       }
 
-      R visit_binary(Ptr<Binary_syntax> s)
+      R visit_Binary(Ptr<Binary_syntax> s)
       {
         return s->operands();
       }
 
-      R visit_ternary(Ptr<Ternary_syntax> s)
+      R visit_Ternary(Ptr<Ternary_syntax> s)
       {
         return s->operands();
       }
     
-      R visit_multiary(Ptr<Multiary_syntax> s)
+      R visit_Multiary(Ptr<Multiary_syntax> s)
       {
         return s->operands();
       }
@@ -112,7 +98,7 @@ namespace beaker
 
     struct Location_visitor : Const_syntax_visitor<Location_visitor, Source_range>
     {
-      Source_range visit_atom(Atom_syntax const* s)
+      Source_range visit_Atom(Atom_syntax const* s)
       {
         Source_location start = s->token().start_location();
         Source_location end = s->token().end_location();
@@ -120,7 +106,7 @@ namespace beaker
       }
 
       // Locations for lists and sequences.
-      Source_range visit_multiary(Multiary_syntax const* s)
+      Source_range visit_Multiary(Multiary_syntax const* s)
       {
         Source_location start = s->operands().front()->location().start;
         Source_location end = s->operands().back()->location().end;
@@ -128,7 +114,7 @@ namespace beaker
       }
 
       // The range of terms like `( ... )`
-      Source_range visit_enclosure(Enclosure_syntax const* s)
+      Source_range visit_Enclosure(Enclosure_syntax const* s)
       {
         Source_location start = s->open().start_location();
         Source_location end = s->close().end_location();
@@ -136,7 +122,7 @@ namespace beaker
       }
 
       // The range of terms like `@e`
-      Source_range visit_prefix(Prefix_syntax const* s)
+      Source_range visit_Prefix(Prefix_syntax const* s)
       {
         Source_location start = s->operation().start_location();
         Source_location end = s->operand()->location().end;
@@ -144,7 +130,7 @@ namespace beaker
       }
 
       // The range of terms like `e@`
-      Source_range visit_postfix(Postfix_syntax const* s)
+      Source_range visit_Postfix(Postfix_syntax const* s)
       {
         Source_location start = s->operand()->location().start;
         Source_location end = s->operation().end_location();
@@ -152,7 +138,7 @@ namespace beaker
       }
 
       // The range of terms like `e0 @ e1`
-      Source_range visit_infix(Infix_syntax const* s)
+      Source_range visit_Infix(Infix_syntax const* s)
       {
         Source_location start = s->lhs()->location().start;
         Source_location end = s->rhs()->location().end;
@@ -160,7 +146,7 @@ namespace beaker
       }
 
       // The range of compound type constructors `ctor e1 e2`.
-      Source_range visit_constructor(Constructor_syntax const* s)
+      Source_range visit_Constructor(Constructor_syntax const* s)
       {
         Source_location start = s->type().start_location();
         Source_location end = s->result()->location().end;
@@ -168,7 +154,7 @@ namespace beaker
       }
 
       // The range of compound type constructors `e1 e2`.
-      Source_range visit_introduction(Introduction_syntax const* s)
+      Source_range visit_Introduction(Introduction_syntax const* s)
       {
         Source_location start = s->introduction()->location().start;
         Source_location end = s->result()->location().end;
@@ -176,7 +162,7 @@ namespace beaker
       }
 
       // The range of compound postfix expressions `e1 e2`.
-      Source_range visit_application(Application_syntax const* s)
+      Source_range visit_Application(Application_syntax const* s)
       {
         Source_location start = s->applicant()->location().start;
         Source_location end = s->arguments()->location().end;
@@ -184,7 +170,7 @@ namespace beaker
       }
 
       // The range of declarations depends on the declarative form.
-      Source_range visit_declaration(Declaration_syntax const* s)
+      Source_range visit_Declaration(Declaration_syntax const* s)
       {
         // The start of a declartion is either the introducer (for declarations
         // and non-special parameters) or the first valid subtree (parameters
@@ -203,7 +189,7 @@ namespace beaker
       }
 
       // The range of a file is that of its declaration sequence.
-      Source_range visit_file(File_syntax const* s)
+      Source_range visit_File(File_syntax const* s)
       {
         return s->declarations()->location();
       }
@@ -227,37 +213,42 @@ namespace beaker
         : os(os)
       { }
 
-      void visit_literal(Literal_syntax const* s)
+      void visit_Literal(Literal_syntax const* s)
       {
         os << " value=" << s->spelling();
       }
 
-      void visit_identifier(Identifier_syntax const* s)
+      void visit_Identifier(Identifier_syntax const* s)
       {
         os << " identifier=" << s->spelling();
       }
 
-      void visit_prefix(Prefix_syntax const* s)
+      void visit_Prefix(Prefix_syntax const* s)
       {
         os << " operator=" << s->operation().spelling();
       }
 
-      void visit_postfix(Postfix_syntax const* s)
+      void visit_Postfix(Postfix_syntax const* s)
       {
         os << " operator=" << s->operation().spelling();
       }
 
-      void visit_infix(Infix_syntax const* s)
+      void visit_Infix(Infix_syntax const* s)
       {
         os << " operator=" << s->operation().spelling();
       }
 
-      void visit_prefix(Constructor_syntax const* s)
+      void visit_Constructor(Constructor_syntax const* s)
       {
         os << " type=" << s->type().spelling();
       }
 
-      void visit_enclosure(Enclosure_syntax const* s)
+      void visit_Introduction(Introduction_syntax const* s)
+      {
+        // Don't fall through to Constructors.
+      }
+
+      void visit_Enclosure(Enclosure_syntax const* s)
       {
         os << " kind=" << s->open().spelling() << s->close().spelling();
       }
@@ -292,7 +283,7 @@ namespace beaker
       void start_line(Syntax const* s)
       {
         // Print the name of the node.
-        os << std::string(depth * 2, ' ') << s->class_name();
+        os << std::string(depth * 2, ' ') << s->kind_name();
         
         // Print the location of the node.
         os << ' ' << '@' << s->location();
@@ -320,7 +311,7 @@ namespace beaker
       }
 
       // Prints information about each node.
-      void visit_syntax(Syntax const* s)
+      void visit_Syntax(Syntax const* s)
       {
         start_line(s);
         visit_attributes(s);
