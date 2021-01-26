@@ -215,32 +215,32 @@ namespace beaker
 
       void visit_Literal(Literal_syntax const* s)
       {
-        os << " value=" << s->spelling();
+        os << " value=" << '\'' << s->spelling() << '\'';
       }
 
       void visit_Identifier(Identifier_syntax const* s)
       {
-        os << " identifier=" << s->spelling();
+        os << " identifier=" << '\'' << s->spelling() << '\'';
       }
 
       void visit_Prefix(Prefix_syntax const* s)
       {
-        os << " operator=" << s->operation().spelling();
+        os << " operator=" << '\'' << s->operation().spelling() << '\'';
       }
 
       void visit_Postfix(Postfix_syntax const* s)
       {
-        os << " operator=" << s->operation().spelling();
+        os << " operator=" << '\'' << s->operation().spelling() << '\'';
       }
 
       void visit_Infix(Infix_syntax const* s)
       {
-        os << " operator=" << s->operation().spelling();
+        os << " operator=" << '\'' << s->operation().spelling( )<< '\'';
       }
 
       void visit_Constructor(Constructor_syntax const* s)
       {
-        os << " type=" << s->type().spelling();
+        os << " type=" << '\'' << s->type().spelling() << '\'';
       }
 
       void visit_Introduction(Introduction_syntax const* s)
@@ -250,7 +250,7 @@ namespace beaker
 
       void visit_Enclosure(Enclosure_syntax const* s)
       {
-        os << " kind=" << s->open().spelling() << s->close().spelling();
+        os << " kind=" << '\'' << s->open().spelling() << s->close().spelling() << '\'';
       }
 
       std::ostream& os;

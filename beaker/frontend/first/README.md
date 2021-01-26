@@ -24,9 +24,16 @@ declaration:
     definition-declaration
 
 definition-declaration:
-    def declarator : type ;
-    def declarator : = expression ;
-    def declarator : type = expression ;
+    def declarator-list type-clause ;
+    def declarator-list : initializer-clause
+    def declarator-list type-clause initializer-clause
+
+type-clause;
+    : type
+
+initializer-clause:
+    = expression ;
+    { statement-list }
 
 parameter:
     identifier : type
@@ -34,6 +41,10 @@ parameter:
     identifeir : = expression
     : type
     : type = expression
+
+declarator-list:
+    declarator
+    declarator-list , declarator
 
 declarator:
     postfix-expression
@@ -45,7 +56,11 @@ expression:
     infix-expression
 
 infix-expression:
+    assignment-expression:
+
+assignment-expression:
     implication-expression
+    implication-expression = assignment-expression
 
 implication-expression:
     logical-or-expression
@@ -118,4 +133,8 @@ expression-list:
 parameter-or-expression:
     parameter
     expression
+
+statement-list
+    statement
+    statement-list statement
 ``` 

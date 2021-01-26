@@ -47,8 +47,12 @@ namespace beaker
   ///
   ///   definition-declaration:
   ///     def declarator-list : type ;
-  ///     def declarator-list : = expression ;
-  ///     def declarator-list : type = expression ;
+  ///     def declarator-list : initializer
+  ///     def declarator-list : type initializer
+  ///
+  ///   initializer:
+  ///     = expression ;
+  ///     { statement-list }
   ///
   /// TODO: Support brace initialization `def x : t { ... }`, although I'm
   /// not sure what the grammar of `...` is. A sequence of statements? A
@@ -76,9 +80,17 @@ namespace beaker
     }
 
     // Parse the initializer.
-    expect(Token::equal_tok);
-    Syntax* init = parse_expression();
-    expect(Token::semicolon_tok);
+    Syntax* init;
+    if (match(Token::equal_tok)) {
+      init = parse_expression();
+      expect(Token::semicolon_tok);
+    }
+    else if (next_token_is(Token::lbrace_tok)) {
+      init = parse_brace_list();
+    }
+    else {
+      diagnose_expected("initializer");
+    }
 
     return new Declaration_syntax(intro, decl, type, init);
   }
@@ -189,7 +201,22 @@ namespace beaker
   ///     implication-expression
   Syntax* Parser::parse_infix_expression()
   {
-    return parse_implication_expression();
+    return parse_assignment_expression();
+  }
+
+  /// Parse an assignment.
+  ///
+  ///   assignment-expression:
+  ///     implication-expression
+  ///     implication-expression = assignment-expression
+  Syntax* Parser::parse_assignment_expression()
+  {
+    Syntax* e0 = parse_implication_expression();
+    if (Token op = match(Token::equal_tok)) {
+      Syntax* e1 = parse_assignment_expression();
+      return new Infix_syntax(op, e0, e1);
+    }
+    return e0;
   }
 
   /// Parse an implication.
@@ -199,7 +226,7 @@ namespace beaker
   ///     logical-or-expression -> implication-expression
   Syntax* Parser::parse_implication_expression()
   {
-    Syntax* e0 = parse_prefix_expression();
+    Syntax* e0 = parse_logical_or_expression();
     if (Token op = match(Token::dash_greater_tok)) {
       Syntax* e1 = parse_implication_expression();
       return new Infix_syntax(op, e0, e1);
@@ -459,6 +486,9 @@ namespace beaker
 
     case Token::lparen_tok:
       return parse_paren_list();
+    
+    case Token::lbrace_tok:
+      return parse_brace_list();
 
     default:
       break;
@@ -592,6 +622,79 @@ namespace beaker
     if (starts_parameter(*this))
       return parse_parameter();
     return parse_expression();
+  }
+
+  /// Parse a brace-enclosed list.
+  ///
+  ///   brace-list:
+  ///     { statement-seq }
+  Syntax* Parser::parse_brace_list()
+  {
+    return parse_enclosed<Enclosure::braces>(&Parser::parse_statement_seq);
+  }
+
+  /// Parse a statement sequence.
+  Syntax* Parser::parse_statement_seq()
+  {
+    // Parse a statement and increment the count. This is used to allow
+    // the omission of the a trailing semicolon on first statements.
+    std::size_t num = 0;
+    auto parse = [this, &num]() {
+      return parse_statement(num++);
+    };
+
+    Syntax_seq ts;
+    parse_item(parse, ts);
+    while (next_token_is_not(Token::rbrace_tok))
+      parse_item(parse, ts);
+
+    return make_declarator_list(ts);
+  }
+
+  /// Parse a statement.
+  ///
+  ///   statement:
+  ///     declaration-statement
+  ///     expression-statement
+  Syntax* Parser::parse_statement(std::size_t n)
+  {
+    switch (lookahead()) {
+    case Token::def_tok:
+      return parse_declaration_statement(n);
+    default:
+      break;
+    }
+    return parse_expression_statement(n);
+  }
+
+  /// Parse a declaration-statement.
+  ///
+  ///   declaration-statement:
+  ///     declaration
+  ///
+  /// Not all declarations are allowed in all scopes. However, we don't
+  /// really have a notion of scope attached to the parse, so we have to
+  /// filter semantically.
+  Syntax* Parser::parse_declaration_statement(std::size_t n)
+  {
+    return parse_declaration();
+  }
+
+  /// Parse an expression-statement.
+  ///
+  ///   expression-statement:
+  ///     expression-list ;?
+  ///
+  /// The semicolon is required this is the first statement in a brace-list
+  /// and the next token is `}`. That allows for brace-lists of the form
+  /// `{ a, b, c }`.
+  Syntax* Parser::parse_expression_statement(std::size_t n)
+  {
+    Syntax* e = parse_expression_list();
+    if (n == 0 && next_token_is(Token::rbrace_tok))
+      return e;
+    expect(Token::semicolon_tok);
+    return e;
   }
 
   void Parser::diagnose_expected(char const* what)

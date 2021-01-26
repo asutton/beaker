@@ -150,6 +150,7 @@ namespace beaker
     
     // Infix expressions.
     virtual Syntax* parse_infix_expression();
+    virtual Syntax* parse_assignment_expression();
     virtual Syntax* parse_implication_expression();
     Syntax* parse_logical_or_expression();
     Syntax* parse_logical_and_expression();
@@ -177,6 +178,13 @@ namespace beaker
     Syntax* parse_bracket_group();
     Syntax* parse_expression_group();
     Syntax* parse_expression_list();
+    Syntax* parse_brace_list();
+
+    // Statements
+    virtual Syntax* parse_statement(std::size_t n);
+    Syntax* parse_declaration_statement(std::size_t n);
+    Syntax* parse_expression_statement(std::size_t n);
+    Syntax* parse_statement_seq();
 
     Syntax* parse_parameter_or_expression();
 
@@ -190,6 +198,19 @@ namespace beaker
       // TODO: If we represent syntax errors explicitly, then
       // the parser will always return a non-null pointer.
       Syntax* s = (parser.*fn)();
+      if (s)
+        ss.push_back(s);
+      return s;
+    }
+
+    /// Same as above, but takes a plain function, not a member function
+    /// pointer.
+    template<typename F>
+    static Syntax* parse_item(F parse, Syntax_seq& ss)
+    {
+      // TODO: If we represent syntax errors explicitly, then
+      // the parser will always return a non-null pointer.
+      Syntax* s = parse();
       if (s)
         ss.push_back(s);
       return s;
