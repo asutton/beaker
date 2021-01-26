@@ -42,8 +42,7 @@ namespace beaker
     case Token::lbracket_tok: {
       Syntax* bound = parse_bracket_group();
       Syntax* type = parse_prefix_expression();
-      // FIXME: There's no token for the constructor.
-      return new Array_syntax({}, bound, type);
+      return new Introduction_syntax(bound, type);
     }
 
     case Token::lparen_tok: {
@@ -51,8 +50,7 @@ namespace beaker
         break;
       Syntax* parms = parse_paren_list();
       Syntax* result = parse_prefix_expression();
-      // FIXME: There's no token for the constructor.
-      return new Function_syntax({}, parms, result);
+      return new Introduction_syntax(parms, result);
     }
 
     case Token::const_tok:

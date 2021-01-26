@@ -345,15 +345,15 @@ namespace beaker
       : Binary_syntax(k, s, r), m_ctor(tok)
     { }
 
-    /// Returns the kind of constructor.
+    /// Returns the type of constructor.
     Token type() const
     {
       return m_ctor;
     }
 
-    /// Returns the "specifier" of a constructor. The interpretation of
-    /// this operand depends on the kind of constructor.
-    Syntax *specifier() const
+    /// Returns the "constructor" of a constructor. Either an array bound
+    /// or a parameter list.
+    Syntax *constructor() const
     {
       return first();
     }
@@ -379,7 +379,7 @@ namespace beaker
     /// Returns the array bound.
     Syntax* bound() const
     {
-      return specifier();
+      return constructor();
     }
 
     using Constructor_syntax::Constructor_syntax;
@@ -395,7 +395,7 @@ namespace beaker
     /// Returns the parameters.
     Syntax *parameters() const
     {
-      return specifier();
+      return constructor();
     }
   };
 
@@ -417,6 +417,30 @@ namespace beaker
     Template_syntax(Token tok, Syntax* p, Syntax* r)
       : Mapping_syntax(this_kind, tok, p, r)
     { }
+  };
+
+  /// A constructor that is not defined by a leading keyword. This is
+  /// effectively a form of right-associative application. Note that we
+  /// don't differentiate between arrays, templates, and functions because
+  /// those names are already used above.
+  ///
+  /// TODO: If I decide to keep this syntax, it should replace the constructor
+  /// syntax above, which has all the good names.
+  struct Introduction_syntax : Constructor_syntax
+  {
+    static constexpr Kind this_kind = introduction_kind;
+
+    Introduction_syntax(Syntax* s, Syntax* t)
+      : Constructor_syntax(this_kind, {}, s, t)
+    { }
+
+    /// Returns the array bound.
+    Syntax* introduction() const
+    {
+      return constructor();
+    }
+
+    using Constructor_syntax::Constructor_syntax;
   };
 
   /// Unary postfix operators.
@@ -604,6 +628,8 @@ namespace beaker
 
     // Visit syntax of the particular kind. This includes visitors for
     // non-leaf bases (e.g., vector, constructor, and application).
+    //
+    // TODO: Automating the formation of this table would be great.
 
     R visit_unary(Ptr<Unary_syntax> s, Parms... parms)
     {
@@ -676,6 +702,11 @@ namespace beaker
     }
 
     R visit_template(Ptr<Template_syntax> s, Parms... parms)
+    {
+      return derived()->visit_constructor(s, parms...);
+    }
+
+    R visit_introduction(Ptr<Introduction_syntax> s, Parms... parms)
     {
       return derived()->visit_constructor(s, parms...);
     }

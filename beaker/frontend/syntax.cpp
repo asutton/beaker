@@ -159,15 +159,23 @@ namespace beaker
         return {start, end};
       }
 
-      // The range of compound type constructors `ctor e1 e2`
+      // The range of compound type constructors `ctor e1 e2`.
       Source_range visit_constructor(Constructor_syntax const* s)
       {
         Source_location start = s->type().start_location();
-        Source_location end = s->specifier()->location().end;
+        Source_location end = s->result()->location().end;
         return {start, end};
       }
 
-      // The range of compound postfix expressions `e1 e2`
+      // The range of compound type constructors `e1 e2`.
+      Source_range visit_introduction(Introduction_syntax const* s)
+      {
+        Source_location start = s->introduction()->location().start;
+        Source_location end = s->result()->location().end;
+        return {start, end};
+      }
+
+      // The range of compound postfix expressions `e1 e2`.
       Source_range visit_application(Application_syntax const* s)
       {
         Source_location start = s->applicant()->location().start;
