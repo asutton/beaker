@@ -46,9 +46,9 @@ namespace beaker
   /// Definition declaration:
   ///
   ///   definition-declaration:
-  ///     def declarator : type ;
-  ///     def declarator : = expression ;
-  ///     def declarator : type = expression ;
+  ///     def declarator-list : type ;
+  ///     def declarator-list : = expression ;
+  ///     def declarator-list : type = expression ;
   ///
   /// TODO: Support brace initialization `def x : t { ... }`, although I'm
   /// not sure what the grammar of `...` is. A sequence of statements? A
@@ -59,7 +59,7 @@ namespace beaker
     Token intro = require(Token::def_tok);
 
     // Parse the declarator
-    Syntax* decl = parse_declarator();
+    Syntax* decl = parse_declarator_list();
 
     // Parse the type.
     expect(Token::colon_tok);
@@ -120,6 +120,37 @@ namespace beaker
     }
 
     return new Declaration_syntax({}, id, type, init);
+  }
+
+  /// Builds the declarator list.
+  static Syntax* make_declarator_list(Syntax_seq& ts)
+  {
+    // TODO: What if `ts` is empty? Recovery means skipping the entire
+    // declaration, probably.
+    assert(!ts.empty());
+
+    // Collapse singleton lists into simple declarators.
+    if (ts.size() == 1)
+      return ts[0];
+
+    return new List_syntax(std::move(ts));
+  }
+
+  /// Parse a declarator-list.
+  ///   declarator-list:
+  ///     declarator
+  ///     declartor-list , declarator
+  ///
+  /// Technically, this allows the declaration of multiple functions having
+  /// the same return type, but we can semantically limit declarators to just
+  /// variables.
+  Syntax* Parser::parse_declarator_list()
+  {
+    Syntax_seq ts;
+    parse_item(*this, &Parser::parse_declarator, ts);
+    while (match(Token::comma_tok))
+      parse_item(*this, &Parser::parse_declarator, ts);
+    return make_declarator_list(ts);
   }
 
   /// Parse a declarator.
@@ -488,7 +519,7 @@ namespace beaker
   }
 
   /// Returns a list defining the group.
-  static Syntax* make_group(std::vector<Syntax*>& ts)
+  static Syntax* make_group(Syntax_seq& ts)
   {
     // This only happens when there's an error and we can't accumulate
     // a group. If we propagate errors, this shouldn't happen at all.
@@ -511,7 +542,7 @@ namespace beaker
   /// Groups are only created if multiple groups are present.
   Syntax* Parser::parse_expression_group()
   {
-    std::vector<Syntax*> ts;
+    Syntax_seq ts;
     parse_item(*this, &Parser::parse_expression_list, ts);
     while (match(Token::semicolon_tok))
       parse_item(*this, &Parser::parse_expression_list, ts);
@@ -519,7 +550,7 @@ namespace beaker
   }
 
   // Returns a list for `ts`.
-  static Syntax* make_list(std::vector<Syntax*>& ts)
+  static Syntax* make_list(Syntax_seq& ts)
   {
     // This only happens when an error occurred.
     if (ts.empty())
@@ -537,7 +568,7 @@ namespace beaker
   /// This always returns a list, even if there's a single element.
   Syntax* Parser::parse_expression_list()
   {
-    std::vector<Syntax*> ts;
+    Syntax_seq ts;
     parse_item(*this, &Parser::parse_parameter_or_expression, ts);
     while (match(Token::comma_tok))
       parse_item(*this, &Parser::parse_parameter_or_expression, ts);

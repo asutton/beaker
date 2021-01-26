@@ -140,6 +140,7 @@ namespace beaker
 
     // Declarators.
     virtual Syntax* parse_declarator();
+    Syntax* parse_declarator_list();
 
     // Types.
     virtual Syntax* parse_type();
