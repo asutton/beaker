@@ -1,6 +1,17 @@
 
 The file extension for this language is `.bkr2`. The compiler can also be run
-with `-language second`. The grammar is:
+with `-language second`. 
+
+This grammar allows parameter groups for array types, which is kind of
+unfortunate, but we can filter on it. In fact, the grammar readily conflates
+template and array types:
+
+```
+[t:type] => type # OK: A template type
+[t:type] type # Syntacially fine, semantically ill-formed
+```
+
+The grammar is:
 
 ```
 file:
@@ -69,9 +80,9 @@ multiplicative-expression:
 
 prefix-expression:
     postfix-expression
-    [ expression-list? ] prefix-expression
-    [ expression-list? ] => prefix-expression
-    ( expression-list? ) -> prefix-expression
+    [ expression-group ] prefix-expression
+    [ expression-group ] => prefix-expression
+    ( expression-group ) -> prefix-expression
     const prefix-exprssion
     ^ prefix-expression
     - prefix-expression
@@ -87,25 +98,11 @@ postfix-expression:
 
 primary-expression:
     literal
-    identifier
-    ( expression-list? )
-    [ expression-list? ]
     id-expression
-
-tuple-expression:
-    paren-list
-
-list-expression:
-    paren-list
+    ( expression-list )
 
 id-expression:
     identifier
-
-paren-list:
-    ( expression-list? )
-
-bracket-list:
-    [ expression-list? ]
 
 expression-group:
     expression-list

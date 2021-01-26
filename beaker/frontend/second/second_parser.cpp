@@ -74,23 +74,23 @@ namespace beaker
     {
     case Token::lbracket_tok: {
       // Match array and template type constructors.
-      Syntax* spec = parse_bracket_list();
+      Syntax* spec = parse_bracket_group();
       Token tok = match(Token::equal_greater_tok);
       Syntax* type = parse_prefix_expression();
       if (tok)
-        return new Template_syntax(tok, spec, type);
+        return new Infix_syntax(tok, spec, type);
       else
-        return new Array_syntax(tok, spec, type);
+        return new Introduction_syntax(spec, type);
     }
 
     case Token::lparen_tok: {
       // Match function type constructors.
       if (!starts_function_type(*this))
         break;
-      Syntax* parms = parse_paren_list();
+      Syntax* parms = parse_paren_group();
       Token tok = expect(Token::dash_greater_tok);
       Syntax* result = parse_prefix_expression();
-      return new Function_syntax(tok, parms, result);
+      return new Infix_syntax(tok, parms, result);
     }
 
     case Token::const_tok:
