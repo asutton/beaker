@@ -130,28 +130,27 @@ namespace beaker
     // Parsing
 
     // Top-level.
-    virtual Syntax* parse_file();
+    Syntax* parse_file();
 
     // Declarations.
-    virtual Syntax* parse_declaration();
+    Syntax* parse_declaration();
     Syntax* parse_definition();
     Syntax* parse_parameter();
     Syntax* parse_declaration_seq();
 
     // Declarators.
-    virtual Syntax* parse_declarator();
+    Syntax* parse_declarator();
     Syntax* parse_declarator_list();
 
     // Types.
-    virtual Syntax* parse_type();
+    Syntax* parse_type();
 
     // Expressions, in general.
-    virtual Syntax* parse_expression();
+    Syntax* parse_expression();
     
     // Infix expressions.
-    virtual Syntax* parse_infix_expression();
-    virtual Syntax* parse_assignment_expression();
-    virtual Syntax* parse_implication_expression();
+    Syntax* parse_infix_expression();
+    Syntax* parse_assignment_expression();
     Syntax* parse_logical_or_expression();
     Syntax* parse_logical_and_expression();
     Syntax* parse_equality_expression();
@@ -160,13 +159,13 @@ namespace beaker
     Syntax* parse_multiplicative_expression();
     
     // Prefix expressions.
-    virtual Syntax* parse_prefix_expression();
+    Syntax* parse_prefix_expression();
     
     // Postfix expressions.
-    virtual Syntax* parse_postfix_expression();
+    Syntax* parse_postfix_expression();
     
     // Primary expressions.
-    virtual Syntax* parse_primary_expression();
+    Syntax* parse_primary_expression();
     Syntax* parse_tuple_expression();
     Syntax* parse_list_expression();
     Syntax* parse_id_expression();
@@ -181,7 +180,7 @@ namespace beaker
     Syntax* parse_brace_list();
 
     // Statements
-    virtual Syntax* parse_statement(std::size_t n);
+    Syntax* parse_statement(std::size_t n);
     Syntax* parse_declaration_statement(std::size_t n);
     Syntax* parse_expression_statement(std::size_t n);
     Syntax* parse_statement_seq();

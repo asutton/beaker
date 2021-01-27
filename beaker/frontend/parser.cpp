@@ -222,24 +222,9 @@ namespace beaker
   ///     implication-expression = assignment-expression
   Syntax* Parser::parse_assignment_expression()
   {
-    Syntax* e0 = parse_implication_expression();
+    Syntax* e0 = parse_logical_or_expression();
     if (Token op = match(Token::equal_tok)) {
       Syntax* e1 = parse_assignment_expression();
-      return new Infix_syntax(op, e0, e1);
-    }
-    return e0;
-  }
-
-  /// Parse an implication.
-  ///
-  ///   implication-expression:
-  ///     logical-or-expression
-  ///     logical-or-expression -> implication-expression
-  Syntax* Parser::parse_implication_expression()
-  {
-    Syntax* e0 = parse_logical_or_expression();
-    if (Token op = match(Token::dash_greater_tok)) {
-      Syntax* e1 = parse_implication_expression();
       return new Infix_syntax(op, e0, e1);
     }
     return e0;
@@ -368,57 +353,78 @@ namespace beaker
     return e0;
   }
 
-  /// Parse a prefix-expression.
+  /// Find the matching offset of the current token.
+  static std::size_t find_matching(Parser& p, Token::Kind k1, Token::Kind k2)
+  {
+    assert(p.lookahead() == k1);
+    std::size_t braces = 0;
+    std::size_t la = 0;
+    while (Token::Kind k = p.lookahead(la)) {
+      if (k == k1) {
+        ++braces;
+      }
+      else if (k == k2) {
+        --braces;
+        if (braces == 0)
+          break;
+      }
+      ++la;
+    }
+    return la;
+  }
+
+  // Returns true if the sequence of tokens would start a function type.
+  // To determine this, starting at '(', we find the matching ')' and then
+  // look for the trailing `->`.
+  //
+  // TODO: This would be cleaner if the enclosure stuff were in the parser
+  // header.
+  static bool starts_function_type(Parser& p)
+  {
+    std::size_t la = find_matching(p, Token::lparen_tok, Token::rparen_tok);
+    return p.lookahead(la + 1) == Token::dash_greater_tok;
+  }
+  
+  /// Parse a prefix expression.
   ///
   ///   prefix-expression:
   ///     postfix-expression
-  ///     array [ expression-list? ] prefix-expression
-  ///     templ [ expression-group? ] prefix-expression
-  ///     func ( expression-group? ) prefix-expression
+  ///     [ expression-list? ] prefix-expression
+  ///     [ expression-list? ] => prefix-expression
+  ///     ( expression-list? ) -> prefix-expression
   ///     const prefix-exprssion
   ///     ^ prefix-expression
   ///     - prefix-expression
   ///     + prefix-expression
   ///     not prefix-expression
   ///
-  /// NOTE: This is the minimal version of a grammar that both avoids extra
-  /// lookahead and permits expressions and types to occupy the same grammar.
-  /// We could add extra annotations after template and function type
-  /// constructors (e.g., `func(int)->int`), but they aren't strictly necessary.
-  ///
-  /// TODO: The name array is somewhat unfortunate, since it makes a nice
-  /// library structure. If arrays in this (or whatever) language had regular
-  /// semantics, we probably wouldn't need the data type.
-  ///
-  /// Eliminating the leading keyword and adding an annotation before the prefix
-  /// expression also works (e.g., (int)->int), but requires lookahead to
-  /// disambiguate the enclosure from primary expressions. It also means that
-  /// we can't parse implications, unless we had some way of explicitly
-  /// characterizing the leading parameter list as something other than a
-  /// primary expression.
+  /// Note that the array notation is unambiguous only because there are no
+  /// primary expressions that start with `[`. For function type constructors,
+  /// we have to brace-match the closing paren and look for the `->`, which
+  /// requires infinite lookahead.
   Syntax* Parser::parse_prefix_expression()
   {
     switch (lookahead())
     {
-    case Token::array_tok: {
-      Token tok = consume();
-      Syntax* bound = parse_bracket_list();
+    case Token::lbracket_tok: {
+      // Match array and template type constructors.
+      Syntax* spec = parse_bracket_group();
+      Token tok = match(Token::equal_greater_tok);
       Syntax* type = parse_prefix_expression();
-      return new Array_syntax(tok, bound, type);
+      if (tok)
+        return new Infix_syntax(tok, spec, type);
+      else
+        return new Introduction_syntax(spec, type);
     }
 
-    case Token::templ_tok: {
-      Token tok = consume();
-      Syntax* parms = parse_bracket_group();
-      Syntax* result = parse_prefix_expression();
-      return new Template_syntax(tok, parms, result);
-    }
-
-    case Token::func_tok: {
-      Token tok = consume();
+    case Token::lparen_tok: {
+      // Match function type constructors.
+      if (!starts_function_type(*this))
+        break;
       Syntax* parms = parse_paren_group();
+      Token tok = expect(Token::dash_greater_tok);
       Syntax* result = parse_prefix_expression();
-      return new Function_syntax(tok, parms, result);
+      return new Infix_syntax(tok, parms, result);
     }
 
     case Token::const_tok:
