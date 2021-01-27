@@ -501,15 +501,9 @@ namespace beaker
   {
     static constexpr Kind this_kind = Declaration;
 
-    Declaration_syntax(Token tok, Syntax* d, Syntax* t, Syntax* i)
-      : Ternary_syntax(this_kind, d, t, i), m_tok(tok)
+    Declaration_syntax(Syntax* d, Syntax* t, Syntax* i)
+      : Ternary_syntax(this_kind, d, t, i)
     { }
-
-    /// Returns the token introducing the declaration.
-    Token introducer() const
-    {
-      return m_tok;
-    }
 
     /// Returns the declarator.
     Syntax* declarator() const
@@ -528,8 +522,6 @@ namespace beaker
     {
       return operand(2);
     }
-
-    Token m_tok;
   };
 
   /// The top-level container of terms.

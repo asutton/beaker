@@ -1,13 +1,15 @@
 
+Declarations are (typically) matched as an identifier followed by a colon.
+
 This grammar spells types from left-to-right as unary prefix operators, but
 does not require leading or trailing tokens. However, to be unambiguous types
 in function and template types must be recognizable as such.
 
 ```
-def a : [3] int; # an array-of-3-ints
-def p : ^int; # a pointer-to-int
-def f : (:int) int; # a function-taking-int-returning-int
-def x : [:type] type; # a template-taking-type-instantiating-type
+a : [3] int; # an array-of-3-ints
+p : ^int; # a pointer-to-int
+f : (:int) int; # a function-taking-int-returning-int
+x : [:type] type; # a template-taking-type-instantiating-type
 ```
 
 Parsing the grammar requires infinite lookahead to identify parameter lists.
@@ -15,11 +17,11 @@ The current implementation assumes parameter lists start with `(x:` or `(:`, but
 the grammar also allows types to be left-distributed:
 
 ```
-def f(a, b : int);
+f(a, b : int);
 ```
 
 In case like this, we'd have to scan the list looking for parameter
-declarations. This is effectively a tentative parse.
+declarations. 
 
 Note that multiparameter declarations like this are potentially ambiguous.
 We generally assume that un-typed parameters implicitly have type `auto`.
@@ -38,11 +40,10 @@ declaration-seq:
 declaration:
     definition-declaration
 
-
 definition-declaration:
-    def declarator-list type-clause ;
-    def declarator-list : initializer-clause
-    def declarator-list type-clause initializer-clause
+    declarator-list? type-clause ;
+    declarator-list? : initializer-clause
+    declarator-list? type-clause initializer-clause
 
 type-clause;
     : type
@@ -59,7 +60,7 @@ parameter:
     : type = expression
 
 declarator:
-    postfix-expression
+    id-expression
 
 type-expression:
     prefix-expression
@@ -155,7 +156,6 @@ parameter-list:
     parameter
     parameter-list , parameter
 
-
 statement-seq
     statement
     statement-seq statement
@@ -163,4 +163,10 @@ statement-seq
 statement:
     declaration-statement
     expression-statement
+
+declaration-statement:
+    definition
+
+expression-statement:
+    expression ;
 ``` 

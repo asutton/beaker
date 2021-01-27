@@ -37,8 +37,14 @@ namespace beaker
       return m_kind;
     }
 
-    /// Returns a string representing the tokens name.
-    char const* kind_name() const;
+    /// Returns a string representing the kind `k`.
+    static const char* kind_name(Kind k);
+
+    /// Returns a string representing the token's kind.
+    char const* kind_name() const
+    {
+      return kind_name(m_kind);
+    }
 
     /// Returns true if this is end-of-file.
     bool is_eof() const

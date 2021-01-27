@@ -4,9 +4,9 @@
 
 namespace beaker
 {
-  char const* Token::kind_name() const
+  char const* Token::kind_name(Kind k)
   {
-    switch (m_kind)
+    switch (k)
     {
 #define def_token(K) \
     case K ## _tok: \
@@ -46,7 +46,7 @@ namespace beaker
     default:
       break;
     }
-    assert(false);
+    return kind_name(k);
   }
 
   std::ostream& operator<<(std::ostream& os, Token const& tok)

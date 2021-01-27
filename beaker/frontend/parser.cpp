@@ -13,12 +13,22 @@ namespace beaker
     m_pos = 0;
   }
 
+  /// Parse a file.
+  ///
+  ///   file:
+  ///     declaration-seq?
   Syntax* Parser::parse_file()
   {
+    // FIXME: Do something different for empty files?
     Syntax* s = parse_declaration_seq();
     return new File_syntax(s);
   }
 
+  /// Parse a sequence of declarations.
+  ///
+  ///   declaration-seq
+  ///     declaration
+  ///     declaration-seq declaration
   Syntax* Parser::parse_declaration_seq()
   {
     Syntax_seq ss;
@@ -27,43 +37,71 @@ namespace beaker
     return new Sequence_syntax(std::move(ss));
   }
 
+  /// Parse a declaration:
+  ///
+  ///   declaration:
+  ///     definition
   Syntax* Parser::parse_declaration()
   {
-    switch (lookahead()) {
-    case Token::def_tok:
-      return parse_definition();
-    default:
-      break;
+    return parse_definition();
+  }
+
+  /// Returns true if the tokens at `la` start a definition.
+  static bool starts_definition(Parser& p, std::size_t la)
+  {
+    // Check for unnamed definitions.
+    if (p.nth_token_is(la, Token::colon_tok))
+      return true;
+    
+    // Check for definitions of the form `x:` and `x,y,z:`
+    if (p.nth_token_is(la, Token::identifier_tok)) {
+      ++la;
+
+      // Match a single declarator.
+      if (p.nth_token_is(la, Token::colon_tok))
+        return true;
+      
+      // Match multiple declarators. Basically, search through a comma-separated
+      // list of identifiers and stop when we reach anything else. Note that
+      // finding anying the like `x, 0` means we can short-circuit at the
+      // 0. There's no way this can be a definition.
+      while (p.nth_token_is(la, Token::comma_tok)) {
+        ++la;
+        if (p.nth_token_is(la, Token::identifier_tok))
+          ++la;
+        else
+          return false;
+      }
+      return p.nth_token_is_not(la, Token::colon_tok);
     }
 
-    // FIXME: Return an error node. Also, how do we recover? We've got
-    // tokens not belonging to any particular declaration, so what would
-    // we skip to.
-    diagnose_expected("declaration");
-    return nullptr;
+    return false;
+  }
+
+  /// Returns true if `p` starts a parameter declaration.
+  static bool starts_definition(Parser& p)
+  {
+    return starts_definition(p, 0);
   }
 
   /// Definition declaration:
   ///
   ///   definition-declaration:
-  ///     def declarator-list : type ;
-  ///     def declarator-list : initializer
-  ///     def declarator-list : type initializer
+  ///     declarator-list? : type ;
+  ///     declarator-list? : initializer
+  ///     declarator-list? : type initializer
   ///
   ///   initializer:
   ///     = expression ;
   ///     { statement-list }
   ///
-  /// TODO: Support brace initialization `def x : t { ... }`, although I'm
-  /// not sure what the grammar of `...` is. A sequence of statements? A
-  /// list of expressions. We can probably build a single grammar that supports
-  /// both.
+  /// TODO: Make sure this stays in line with the grammar.
   Syntax* Parser::parse_definition()
   {
-    Token intro = require(Token::def_tok);
-
-    // Parse the declarator
-    Syntax* decl = parse_declarator_list();
+    // Parse the declarator-list.
+    Syntax* decl = nullptr;
+    if (next_token_is_not(Token::colon_tok))
+      decl = parse_declarator_list();
 
     // Parse the type.
     expect(Token::colon_tok);
@@ -74,7 +112,7 @@ namespace beaker
 
       // Match the 'decl : type ;' case.
       if (match(Token::semicolon_tok))
-        return new Declaration_syntax(intro, decl, type, nullptr);
+        return new Declaration_syntax(decl, type, nullptr);
 
       // Fall through to parse the initializer.
     }
@@ -92,7 +130,7 @@ namespace beaker
       diagnose_expected("initializer");
     }
 
-    return new Declaration_syntax(intro, decl, type, init);
+    return new Declaration_syntax(decl, type, init);
   }
 
   /// Parser a parameter:
@@ -115,7 +153,7 @@ namespace beaker
       Syntax* init = nullptr;
       if (match(Token::equal_tok))
         init = parse_expression();
-      return new Declaration_syntax({}, nullptr, type, init);
+      return new Declaration_syntax(nullptr, type, init);
     }
 
     // Match the identifier...
@@ -131,7 +169,7 @@ namespace beaker
         init = parse_expression();
     }
 
-    return new Declaration_syntax({}, id, type, init);
+    return new Declaration_syntax(id, type, init);
   }
 
   /// Builds the declarator list.
@@ -168,10 +206,13 @@ namespace beaker
   /// Parse a declarator.
   ///
   ///   declarator:
-  ///     postfix-expression
+  ///     id-expression
+  ///
+  /// This is a restriction on a more general grammar that allows function
+  /// and/or array-like declarators.
   Syntax* Parser::parse_declarator()
   {
-    return parse_postfix_expression();
+    return parse_id_expression();
   }
 
   /// Parse a type expression.
@@ -333,8 +374,8 @@ namespace beaker
   ///
   ///   additive-expression:
   ///     multiplicative-expression
-  ///     additive-expression < multiplicative-expression
-  ///     additive-expression > multiplicative-expression
+  ///     additive-expression + multiplicative-expression
+  ///     additive-expression - multiplicative-expression
   Syntax* Parser::parse_additive_expression()
   {
     Syntax* e0 = parse_multiplicative_expression();
@@ -355,9 +396,10 @@ namespace beaker
   /// Parse a multiplicative expression.
   ///
   ///   multiplicative-expression:
-  ///     prefix-exprssion
-  ///     multiplicative-expression < prefix-exprssion
-  ///     multiplicative-expression > prefix-exprssion
+  ///     prefix-expression
+  ///     multiplicative-expression * prefix-expression
+  ///     multiplicative-expression / prefix-expression
+  ///     multiplicative-expression % prefix-expression
   Syntax* Parser::parse_multiplicative_expression()
   {
     Syntax* e0 = parse_prefix_expression();
@@ -369,26 +411,17 @@ namespace beaker
   }
 
   /// Returns true if we're at the start of a parameter list.
-  ///
-  /// FIXME: The parameter specification may not appear in the first
-  /// position (e.g., `(a, b, c : Int)`). We need to scan over the
-  /// top-level arguments looking for it.
   static bool is_parameter_list(Parser& p)
   {
-    assert(p.lookahead() == Token::lparen_tok ||
-           p.lookahead() == Token::lbracket_tok);
+    assert(p.next_token_is(Token::lparen_tok) || p.next_token_is(Token::lbracket_tok));
 
-    // Match `( )` and `( :`
-    Token::Kind k1 = p.lookahead(1);
-    if (k1 == Token::rparen_tok || k1 == Token::colon_tok)
+    // Match an empty parameter list.
+    if (p.nth_token_is(1, Token::rparen_tok))
       return true;
-    
-    // Match `( identifier :`.
-    Token::Kind k2 = p.lookahead(2);
-    if (k1 == Token::identifier_tok && k2 == Token::colon_tok)
-      return true;
-    
-    return false;
+
+    // Otherwise, look to see if this contains a definition of one or more
+    // parameters.
+    return starts_definition(p, 1);
   }
 
   /// Find the matching offset of the current token.
@@ -401,7 +434,7 @@ namespace beaker
   static std::size_t find_matching(Parser& p, Token::Kind k1, Token::Kind k2)
   {
     assert(p.lookahead() == k1);
-    std::size_t la;
+    std::size_t la = 0;
     std::size_t braces = 0;
     while (Token::Kind k = p.lookahead(la)) {
       if (k == k1) {
@@ -458,7 +491,7 @@ namespace beaker
   ///     postfix-expression
   ///     [ expression-group? ] prefix-expression
   ///     ( parameter-group? ) prefix-expression
-  ///     const prefix-exprssion
+  ///     const prefix-expression
   ///     ^ prefix-expression
   ///     - prefix-expression
   ///     + prefix-expression
@@ -790,12 +823,8 @@ namespace beaker
   ///     expression-statement
   Syntax* Parser::parse_statement(std::size_t n)
   {
-    switch (lookahead()) {
-    case Token::def_tok:
+    if (starts_definition(*this))
       return parse_declaration_statement(n);
-    default:
-      break;
-    }
     return parse_expression_statement(n);
   }
 

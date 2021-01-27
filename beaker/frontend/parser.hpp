@@ -28,7 +28,7 @@ namespace beaker
       return m_pos == m_toks.size();
     }
 
-    Source_location input_location()
+    Source_location input_location() const
     {
       return peek().start_location();
     }
@@ -62,27 +62,33 @@ namespace beaker
     }
 
     /// Returns true if the next token has kind `k`.
-    bool next_token_is(Token::Kind k)
+    bool next_token_is(Token::Kind k) const
     {
       return lookahead() == k;
     }
 
-    /// Returns true if the nth token has kind `k`.
-    bool nth_token_is(int n, Token::Kind k)
-    {
-      return lookahead(n) == k;
-    }
-
     /// Returns true if the next two tokens have kind `k1` and `k2`.
-    bool next_tokens_are(Token::Kind k1, Token::Kind k2)
+    bool next_tokens_are(Token::Kind k1, Token::Kind k2) const
     {
       return next_token_is(k1) && nth_token_is(1, k2);
     }
 
     /// Returns true if the next token does not have kind `k`.
-    bool next_token_is_not(Token::Kind k)
+    bool next_token_is_not(Token::Kind k) const
     {
       return lookahead() != k;
+    }
+
+    /// Returns true if the nth token has kind `k`.
+    bool nth_token_is(int n, Token::Kind k) const
+    {
+      return lookahead(n) == k;
+    }
+
+    /// Returns true if the nth token does not have kind `k`.
+    bool nth_token_is_not(int n, Token::Kind k) const
+    {
+      return lookahead(n) != k;
     }
 
     /// Consume the current, returning it.

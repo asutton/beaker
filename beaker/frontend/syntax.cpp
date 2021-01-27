@@ -164,19 +164,8 @@ namespace beaker
       // The range of declarations depends on the declarative form.
       Source_range visit_Declaration(Declaration_syntax const* s)
       {
-        // The start of a declartion is either the introducer (for declarations
-        // and non-special parameters) or the first valid subtree (parameters
-        // may omit the name).
-        Source_location start;
-        if (Token tok = s->introducer())
-          start = tok.start_location();
-        else
-          start = first_nonnull(s->operands())->location().start;
-        
-        // The end declaration is that of the last valid subtree (the
-        // initializer may be omitted).
+        Source_location start = first_nonnull(s->operands())->location().start;
         Source_location end = last_nonnull(s->operands())->location().end;
-
         return {start, end};
       }
 
