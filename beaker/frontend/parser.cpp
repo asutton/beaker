@@ -385,6 +385,67 @@ namespace beaker
     return false;
   }
 
+  /// Find the matching offset of the current token.
+  ///
+  /// FIXME: With parameter groups, this isn't quite right. We need to
+  /// skim over all top-level commas, looking parameters.
+  ///
+  /// TODO: It might be worthwhile combining this and the function below.
+  /// Otherwise, we have multiple scans over the same tokens.
+  static std::size_t find_matching(Parser& p, Token::Kind k1, Token::Kind k2)
+  {
+    assert(p.lookahead() == k1);
+    std::size_t la;
+    std::size_t braces = 0;
+    while (Token::Kind k = p.lookahead(la)) {
+      if (k == k1) {
+        ++braces;
+      }
+      else if (k == k2) {
+        --braces;
+        if (braces == 0)
+          break;
+      }
+      ++la;
+    }
+    return la;
+  }
+
+  // An lparen starts a prefix operator if the first few tokens start a
+  // prefix operator, and the entire enclosure is not followed by something
+  // that is eithe a primary expression or other prefix operator.
+  static bool is_prefix_operator(Parser& p)
+  {
+    if (!starts_function_type(p))
+      return false;
+
+    std::size_t la = find_matching(p, Token::lparen_tok, Token::rparen_tok);
+    switch (p.lookahead(la + 1)) {
+      // Primary expressions.
+      case Token::true_tok:
+      case Token::false_tok:
+      case Token::integer_tok:
+      case Token::int_tok:
+      case Token::bool_tok:
+      case Token::type_tok:
+      case Token::identifier_tok:
+      case Token::lbrace_tok:
+      // Both prefix and primary.
+      case Token::lparen_tok:
+      // Other prefix operators.
+      case Token::lbracket_tok:
+      case Token::const_tok:
+      case Token::caret_tok:
+      case Token::plus_tok:
+      case Token::dash_tok:
+      case Token::not_tok:
+        return true;
+      default:
+        break;
+    }
+    return false;
+  }
+
   /// Parse a prefix-expression.
   ///
   ///   prefix-expression:
@@ -407,7 +468,7 @@ namespace beaker
     }
 
     case Token::lparen_tok: {
-      if (!starts_function_type(*this))
+      if (!is_prefix_operator(*this))
         break;
       Syntax* parms = parse_paren_list();
       Syntax* result = parse_prefix_expression();
