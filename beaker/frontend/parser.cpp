@@ -72,7 +72,8 @@ namespace beaker
         else
           return false;
       }
-      return p.nth_token_is_not(la, Token::colon_tok);
+
+      return p.nth_token_is(la, Token::colon_tok);
     }
 
     return false;
