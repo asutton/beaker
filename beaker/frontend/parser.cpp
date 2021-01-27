@@ -368,57 +368,50 @@ namespace beaker
     return e0;
   }
 
+  static bool starts_function_type(Parser& p)
+  {
+    assert(p.lookahead() == Token::lparen_tok);
+
+    // Match `( )` and `( :`
+    Token::Kind k1 = p.lookahead(1);
+    if (k1 == Token::rparen_tok || k1 == Token::colon_tok)
+      return true;
+    
+    // Match `( identifier :`.
+    Token::Kind k2 = p.lookahead(2);
+    if (k1 == Token::identifier_tok && k2 == Token::colon_tok)
+      return true;
+    
+    return false;
+  }
+
   /// Parse a prefix-expression.
   ///
   ///   prefix-expression:
   ///     postfix-expression
-  ///     array [ expression-list? ] prefix-expression
-  ///     templ [ expression-group? ] prefix-expression
-  ///     func ( expression-group? ) prefix-expression
+  ///     [ expression-group? ] prefix-expression
+  ///     ( parameter-group? ) prefix-expression
   ///     const prefix-exprssion
   ///     ^ prefix-expression
   ///     - prefix-expression
   ///     + prefix-expression
   ///     not prefix-expression
-  ///
-  /// NOTE: This is the minimal version of a grammar that both avoids extra
-  /// lookahead and permits expressions and types to occupy the same grammar.
-  /// We could add extra annotations after template and function type
-  /// constructors (e.g., `func(int)->int`), but they aren't strictly necessary.
-  ///
-  /// TODO: The name array is somewhat unfortunate, since it makes a nice
-  /// library structure. If arrays in this (or whatever) language had regular
-  /// semantics, we probably wouldn't need the data type.
-  ///
-  /// Eliminating the leading keyword and adding an annotation before the prefix
-  /// expression also works (e.g., (int)->int), but requires lookahead to
-  /// disambiguate the enclosure from primary expressions. It also means that
-  /// we can't parse implications, unless we had some way of explicitly
-  /// characterizing the leading parameter list as something other than a
-  /// primary expression.
   Syntax* Parser::parse_prefix_expression()
   {
     switch (lookahead())
     {
-    case Token::array_tok: {
-      Token tok = consume();
-      Syntax* bound = parse_bracket_list();
+    case Token::lbracket_tok: {
+      Syntax* bound = parse_bracket_group();
       Syntax* type = parse_prefix_expression();
-      return new Array_syntax(tok, bound, type);
+      return new Introduction_syntax(bound, type);
     }
 
-    case Token::templ_tok: {
-      Token tok = consume();
-      Syntax* parms = parse_bracket_group();
+    case Token::lparen_tok: {
+      if (!starts_function_type(*this))
+        break;
+      Syntax* parms = parse_paren_list();
       Syntax* result = parse_prefix_expression();
-      return new Template_syntax(tok, parms, result);
-    }
-
-    case Token::func_tok: {
-      Token tok = consume();
-      Syntax* parms = parse_paren_group();
-      Syntax* result = parse_prefix_expression();
-      return new Function_syntax(tok, parms, result);
+      return new Introduction_syntax(parms, result);
     }
 
     case Token::const_tok:
@@ -633,6 +626,63 @@ namespace beaker
     if (starts_parameter(*this))
       return parse_parameter();
     return parse_expression();
+  }
+
+  /// Returns a list defining the group.
+  static Syntax* make_parameter_group(std::vector<Syntax*>& ts)
+  {
+    // This only happens when there's an error and we can't accumulate
+    // a group. If we propagate errors, this shouldn't happen at all.
+    if (ts.empty())
+      return nullptr;    
+
+    // Don't allocate groups if there's only one present.    
+    if (ts.size() == 1)
+      return ts[0];
+
+    return new List_syntax(std::move(ts));
+  }
+
+  /// Parse an expression-group.
+  ///
+  ///   parameter-group:
+  ///     parameter-list
+  ///     parameter-group ; parameter-list
+  ///
+  /// Groups are only created if multiple groups are present.
+  Syntax* Parser::parse_parameter_group()
+  {
+    std::vector<Syntax*> ts;
+    parse_item(*this, &Parser::parse_parameter_list, ts);
+    while (match(Token::semicolon_tok))
+      parse_item(*this, &Parser::parse_parameter_list, ts);
+    return make_parameter_group(ts);
+  }
+
+  // Returns a list for `ts`.
+  static Syntax* make_parameter_list(std::vector<Syntax*>& ts)
+  {
+    // This only happens when an error occurred.
+    if (ts.empty())
+      return nullptr;
+
+    return new List_syntax(std::move(ts));
+  }
+
+  /// Parse an parameter-list.
+  ///
+  ///   parameter-list:
+  ///     parameter
+  ///     parameter-list , parameter
+  ///
+  /// This always returns a list, even if there's a single element.
+  Syntax* Parser::parse_parameter_list()
+  {
+    std::vector<Syntax*> ts;
+    parse_item(*this, &Parser::parse_parameter, ts);
+    while (match(Token::comma_tok))
+      parse_item(*this, &Parser::parse_parameter, ts);
+    return make_parameter_list(ts);
   }
 
   /// Parse a brace-enclosed list.

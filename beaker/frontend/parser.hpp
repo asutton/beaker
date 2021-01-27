@@ -178,7 +178,10 @@ namespace beaker
     Syntax* parse_bracket_group();
     Syntax* parse_expression_group();
     Syntax* parse_expression_list();
+    Syntax* parse_parameter_group();
+    Syntax* parse_parameter_list();
     Syntax* parse_brace_list();
+    Syntax* parse_parameter_or_expression();
 
     // Statements
     virtual Syntax* parse_statement(std::size_t n);
@@ -186,7 +189,6 @@ namespace beaker
     Syntax* parse_expression_statement(std::size_t n);
     Syntax* parse_statement_seq();
 
-    Syntax* parse_parameter_or_expression();
 
     // Generic parsers and utilities
 
