@@ -40,7 +40,6 @@ def_abstract(Constructor, Binary)
 def_syntax(Array, Constructor)
 def_syntax(Function, Constructor)
 def_syntax(Template, Constructor)
-def_syntax(Introduction, Constructor)
 
 // Unary postfix operators (e.g., e^)
 def_syntax(Postfix, Unary)

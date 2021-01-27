@@ -368,9 +368,15 @@ namespace beaker
     return e0;
   }
 
-  static bool starts_function_type(Parser& p)
+  /// Returns true if we're at the start of a parameter list.
+  ///
+  /// FIXME: The parameter specification may not appear in the first
+  /// position (e.g., `(a, b, c : Int)`). We need to scan over the
+  /// top-level arguments looking for it.
+  static bool is_parameter_list(Parser& p)
   {
-    assert(p.lookahead() == Token::lparen_tok);
+    assert(p.lookahead() == Token::lparen_tok ||
+           p.lookahead() == Token::lbracket_tok);
 
     // Match `( )` and `( :`
     Token::Kind k1 = p.lookahead(1);
@@ -416,7 +422,7 @@ namespace beaker
   // that is eithe a primary expression or other prefix operator.
   static bool is_prefix_operator(Parser& p)
   {
-    if (!starts_function_type(p))
+    if (!is_parameter_list(p))
       return false;
 
     std::size_t la = find_matching(p, Token::lparen_tok, Token::rparen_tok);
@@ -462,9 +468,12 @@ namespace beaker
     switch (lookahead())
     {
     case Token::lbracket_tok: {
+      bool templ = is_parameter_list(*this);
       Syntax* bound = parse_bracket_group();
       Syntax* type = parse_prefix_expression();
-      return new Introduction_syntax(bound, type);
+      if (templ)
+        return new Template_syntax(bound, type);
+      return new Array_syntax(bound, type);
     }
 
     case Token::lparen_tok: {
@@ -472,7 +481,7 @@ namespace beaker
         break;
       Syntax* parms = parse_paren_list();
       Syntax* result = parse_prefix_expression();
-      return new Introduction_syntax(parms, result);
+      return new Function_syntax(parms, result);
     }
 
     case Token::const_tok:

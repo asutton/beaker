@@ -335,18 +335,12 @@ namespace beaker
     Token m_op;
   };
 
-  /// Compound type constructors.
+  /// Compound type constructors for arrays, templates, and functions.
   struct Constructor_syntax : Binary_syntax
   {
-    Constructor_syntax(Kind k, Token tok, Syntax* s, Syntax* r)
-      : Binary_syntax(k, s, r), m_ctor(tok)
+    Constructor_syntax(Kind k, Syntax* s, Syntax* r)
+      : Binary_syntax(k, s, r)
     { }
-
-    /// Returns the type of constructor.
-    Token type() const
-    {
-      return m_ctor;
-    }
 
     /// Returns the "constructor" of a constructor. Either an array bound
     /// or a parameter list.
@@ -360,8 +354,6 @@ namespace beaker
     {
       return second();
     }
-
-    Token m_ctor;
   };
 
   /// Array type constructor.
@@ -369,12 +361,12 @@ namespace beaker
   {
     static constexpr Kind this_kind = Array;
 
-    Array_syntax(Token tok, Syntax* s, Syntax* t)
-      : Constructor_syntax(this_kind, tok, s, t)
+    Array_syntax(Syntax* s, Syntax* t)
+      : Constructor_syntax(this_kind, s, t)
     { }
 
     /// Returns the array bound.
-    Syntax* bound() const
+    Syntax* bounds() const
     {
       return constructor();
     }
@@ -382,11 +374,11 @@ namespace beaker
     using Constructor_syntax::Constructor_syntax;
   };
 
-  /// Mapping type constructors.
+  /// Mapping type constructors (templates and functions).
   struct Mapping_syntax : Constructor_syntax
   {
-    Mapping_syntax(Kind k, Token tok, Syntax* p, Syntax* r)
-      : Constructor_syntax(k, tok, p, r)
+    Mapping_syntax(Kind k, Syntax* p, Syntax* r)
+      : Constructor_syntax(k, p, r)
     { }
 
     /// Returns the parameters.
@@ -401,8 +393,8 @@ namespace beaker
   {
     static constexpr Kind this_kind = Function;
 
-    Function_syntax(Token tok, Syntax* p, Syntax* r)
-      : Mapping_syntax(this_kind, tok, p, r)
+    Function_syntax(Syntax* p, Syntax* r)
+      : Mapping_syntax(this_kind, p, r)
     { }
   };
 
@@ -411,36 +403,9 @@ namespace beaker
   {
     static constexpr Kind this_kind = Template;
 
-    Template_syntax(Token tok, Syntax* p, Syntax* r)
-      : Mapping_syntax(this_kind, tok, p, r)
+    Template_syntax(Syntax* p, Syntax* r)
+      : Mapping_syntax(this_kind, p, r)
     { }
-  };
-
-  /// A constructor that is not defined by a leading keyword. This is
-  /// effectively a form of right-associative application. Note that we
-  /// don't differentiate between arrays, templates, and functions because
-  /// those names are already used above.
-  ///
-  /// TODO: If I decide to keep this syntax, it should replace the constructor
-  /// syntax above, which has all the good names.
-  ///
-  /// TODO: Also, this should really be a base class of the constructor
-  /// syntax, but also a concrete node in its own right.
-  struct Introduction_syntax : Constructor_syntax
-  {
-    static constexpr Kind this_kind = Introduction;
-
-    Introduction_syntax(Syntax* s, Syntax* t)
-      : Constructor_syntax(this_kind, {}, s, t)
-    { }
-
-    /// Returns the array bound.
-    Syntax* introduction() const
-    {
-      return constructor();
-    }
-
-    using Constructor_syntax::Constructor_syntax;
   };
 
   /// Unary postfix operators.
