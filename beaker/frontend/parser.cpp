@@ -89,14 +89,10 @@ namespace beaker
   ///
   ///   definition-declaration:
   ///     declarator-list? : type ;
-  ///     declarator-list? : initializer
-  ///     declarator-list? : type initializer
-  ///
-  ///   initializer:
-  ///     = expression ;
-  ///     { statement-list }
-  ///
-  /// TODO: Make sure this stays in line with the grammar.
+  ///     declarator-list? : = expression ;
+  ///     declarator-list? : = { statement-seq? }
+  ///     declarator-list? : type = expression ;
+  ///     declarator-list? : type = { statement-seq }
   Syntax* Parser::parse_definition()
   {
     // Parse the declarator-list.
@@ -120,15 +116,13 @@ namespace beaker
 
     // Parse the initializer.
     Syntax* init;
-    if (match(Token::equal_tok)) {
-      init = parse_expression();
-      expect(Token::semicolon_tok);
-    }
-    else if (next_token_is(Token::lbrace_tok)) {
+    expect(Token::equal_tok);
+    if (next_token_is(Token::lbrace_tok)) {
       init = parse_brace_list();
     }
     else {
-      diagnose_expected("initializer");
+      init = parse_expression();
+      expect(Token::semicolon_tok);
     }
 
     return new Declaration_syntax(decl, type, init);
@@ -469,7 +463,6 @@ namespace beaker
       case Token::bool_tok:
       case Token::type_tok:
       case Token::identifier_tok:
-      case Token::lbrace_tok:
       // Both prefix and primary.
       case Token::lparen_tok:
       // Other prefix operators.
@@ -595,9 +588,6 @@ namespace beaker
     case Token::lparen_tok:
       return parse_paren_list();
     
-    case Token::lbrace_tok:
-      return parse_brace_list();
-
     default:
       break;
     }
@@ -801,17 +791,10 @@ namespace beaker
   /// Parse a statement sequence.
   Syntax* Parser::parse_statement_seq()
   {
-    // Parse a statement and increment the count. This is used to allow
-    // the omission of the a trailing semicolon on first statements.
-    std::size_t num = 0;
-    auto parse = [this, &num]() {
-      return parse_statement(num++);
-    };
-
     Syntax_seq ts;
-    parse_item(parse, ts);
+    parse_item(*this, &Parser::parse_statement, ts);
     while (next_token_is_not(Token::rbrace_tok))
-      parse_item(parse, ts);
+      parse_item(*this, &Parser::parse_statement, ts);
 
     return make_declarator_list(ts);
   }
@@ -819,14 +802,27 @@ namespace beaker
   /// Parse a statement.
   ///
   ///   statement:
+  ///     block-statement
   ///     declaration-statement
-  ///     return-statement
   ///     expression-statement
-  Syntax* Parser::parse_statement(std::size_t n)
+  Syntax* Parser::parse_statement()
   {
+    if (next_token_is(Token::lbrace_tok))
+      return parse_block_statement();
+
     if (starts_definition(*this))
-      return parse_declaration_statement(n);
-    return parse_expression_statement(n);
+      return parse_declaration_statement();
+
+    return parse_expression_statement();
+  }
+
+  /// Parse a block-statement.
+  ///
+  ///   block-statement:
+  ///     { statement-seq }
+  Syntax* Parser::parse_block_statement()
+  {
+    return parse_brace_list();
   }
 
   /// Parse a declaration-statement.
@@ -837,7 +833,7 @@ namespace beaker
   /// Not all declarations are allowed in all scopes. However, we don't
   /// really have a notion of scope attached to the parse, so we have to
   /// filter semantically.
-  Syntax* Parser::parse_declaration_statement(std::size_t n)
+  Syntax* Parser::parse_declaration_statement()
   {
     return parse_declaration();
   }
@@ -845,16 +841,10 @@ namespace beaker
   /// Parse an expression-statement.
   ///
   ///   expression-statement:
-  ///     expression-list ;?
-  ///
-  /// The semicolon is required this is the first statement in a brace-list
-  /// and the next token is `}`. That allows for brace-lists of the form
-  /// `{ a, b, c }`.
-  Syntax* Parser::parse_expression_statement(std::size_t n)
+  ///     expression-list ;
+  Syntax* Parser::parse_expression_statement()
   {
     Syntax* e = parse_expression_list();
-    if (n == 0 && next_token_is(Token::rbrace_tok))
-      return e;
     expect(Token::semicolon_tok);
     return e;
   }
