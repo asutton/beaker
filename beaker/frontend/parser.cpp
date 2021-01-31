@@ -19,9 +19,10 @@ namespace beaker
   ///     declaration-seq?
   Syntax* Parser::parse_file()
   {
-    // FIXME: Do something different for empty files?
-    Syntax* s = parse_declaration_seq();
-    return new File_syntax(s);
+    Syntax* decls = nullptr;
+    if (!eof())
+      decls = parse_declaration_seq();
+    return new File_syntax(decls);
   }
 
   /// Parse a sequence of declarations.
@@ -85,14 +86,83 @@ namespace beaker
     return starts_definition(p, 0);
   }
 
+  namespace
+  {
+    struct Descriptor_clause
+    {
+      Syntax* type = {};
+      Syntax* cons = {};
+    };
+
+    // Parse a descriptor clause.
+    //
+    //   descriptor-clause: 
+    //     : descriptor constraint? 
+    //     : constraint? 
+    //
+    //   constraint:
+    //     is pattern
+    Descriptor_clause parse_descriptor_clause(Parser& p)
+    {
+      Descriptor_clause dc;
+      p.expect(Token::colon_tok);
+      if (p.next_token_is(Token::is_tok)) {
+        dc.cons = p.parse_constraint();
+      }
+      else {
+        dc.type = p.parse_descriptor();
+        if (p.next_token_is(Token::is_tok))
+          dc.cons = p.parse_constraint();
+      }
+      return dc;
+    }
+
+    struct Initializer_clause
+    {
+      Syntax* init = {};
+    };
+
+    //   initializer-clause: 
+    //     ; 
+    //     = expression ; 
+    //     = block-statement
+    Initializer_clause parse_initializer_clause(Parser& p)
+    {
+      Initializer_clause clause;
+      p.expect(Token::equal_tok);
+      if (p.next_token_is(Token::lbrace_tok)) {
+        clause.init = p.parse_block_statement();
+      }
+      else {
+        clause.init = p.parse_expression();
+        p.expect(Token::semicolon_tok);
+      }
+      return clause;
+    }
+  } // namespace
+
   /// Definition declaration:
   ///
   ///   definition-declaration:
-  ///     declarator-list? : type ;
-  ///     declarator-list? : = expression ;
-  ///     declarator-list? : = { statement-seq? }
-  ///     declarator-list? : type = expression ;
-  ///     declarator-list? : type = { statement-seq }
+  ///     declarator-list? type-clause initializer-clause 
+  ///
+  ///   type-clause: 
+  ///     : type constraint? 
+  ///     : constraint? 
+  ///
+  ///   type: 
+  ///     prefix-expression 
+  ///
+  ///   constraint:
+  ///     is pattern
+  ///
+  ///   initializer-clause: 
+  ///     ; 
+  ///     = expression ; 
+  ///     = block-statement
+  ///
+  ///   block:
+  ///     block-statement 
   Syntax* Parser::parse_definition()
   {
     // Parse the declarator-list.
@@ -100,71 +170,10 @@ namespace beaker
     if (next_token_is_not(Token::colon_tok))
       decl = parse_declarator_list();
 
-    // Parse the type.
-    expect(Token::colon_tok);
-    
-    Syntax* type = nullptr;
-    if (next_token_is_not(Token::equal_tok)) {
-      type = parse_type();
+    Descriptor_clause dc = parse_descriptor_clause(*this);
+    Initializer_clause ic = parse_initializer_clause(*this);
 
-      // Match the 'decl : type ;' case.
-      if (match(Token::semicolon_tok))
-        return new Declaration_syntax(decl, type, nullptr);
-
-      // Fall through to parse the initializer.
-    }
-
-    // Parse the initializer.
-    Syntax* init;
-    expect(Token::equal_tok);
-    if (next_token_is(Token::lbrace_tok)) {
-      init = parse_brace_list();
-    }
-    else {
-      init = parse_expression();
-      expect(Token::semicolon_tok);
-    }
-
-    return new Declaration_syntax(decl, type, init);
-  }
-
-  /// Parser a parameter:
-  ///
-  ///   parameter:
-  ///     identifier : type
-  ///     identifier : type = expression
-  ///     identifeir : = expression
-  ///     : type
-  ///     : type = expression
-  ///
-  /// TODO: Can parameters have introducers?
-  ///
-  /// TODO: Can paramters be packs (yes, but what's the syntax?).
-  Syntax* Parser::parse_parameter()
-  {
-    // Match unnamed variants.
-    if (match(Token::colon_tok)) {
-      Syntax* type = parse_type();
-      Syntax* init = nullptr;
-      if (match(Token::equal_tok))
-        init = parse_expression();
-      return new Declaration_syntax(nullptr, type, init);
-    }
-
-    // Match the identifier...
-    Syntax* id = parse_id_expression();
-    
-    // ... And optional declarative information
-    Syntax* type = nullptr;
-    Syntax* init = nullptr;
-    if (match(Token::colon_tok)) {
-      if (next_token_is_not(Token::equal_tok))
-        type = parse_type();
-      if (match(Token::equal_tok))
-        init = parse_expression();
-    }
-
-    return new Declaration_syntax(id, type, init);
+    return new Declaration_syntax(decl, dc.type, dc.cons, ic.init);
   }
 
   /// Builds the declarator list.
@@ -212,43 +221,311 @@ namespace beaker
 
   /// Parse a type expression.
   ///
-  ///   type-expression:
+  ///   descriptor:
   ///     prefix-expression
-  Syntax* Parser::parse_type()
+  ///
+  /// A descriptor specifies part of the signature of a declaration, including
+  /// its template parameters, function parameters, array bounds, and type.
+  Syntax* Parser::parse_descriptor()
   {
     return parse_prefix_expression();
+  }
+
+  /// Parse a constraint.
+  ///
+  ///   constraint-clause:
+  ///     is pattern
+  ///
+  /// TODO: We can have is constraints and where constraints. The difference
+  /// is that in an is constraint, the declared entity implicitly participates
+  /// in the expression, but not in a where constraint.
+  Syntax* Parser::parse_constraint()
+  {
+    require(Token::is_tok);
+    return parse_pattern();
   }
 
   /// Parse an expression.
   ///
   ///   expression:
-  ///     infix-expression
-  ///     return infix-expression
-  ///     yield infix-expression
-  ///     throw infix-expression
-  ///
-  /// TODO: Actually implement throw and yield.
+  ///     leave-expression 
+  ///     expression where ( parameter-group )
   Syntax* Parser::parse_expression()
   {
+    Syntax* e0 = parse_leave_expression();
+    while (Token op = match(Token::where_tok)) {
+      Syntax* e1 = parse_paren_enclosed(&Parser::parse_parameter_group);
+      new Infix_syntax(op, e0, e1);
+    }
+    return e0;
+  }
+
+  /// Parse a leave-expression.
+  ///
+  ///   leave-expression:
+  ///     control-expression
+  ///     return control-expression
+  ///     throw control-expression
+  Syntax* Parser::parse_leave_expression()
+  {
     switch (lookahead()) {
-    case Token::return_tok: {
-      Token tok = consume();
-      Syntax* e = parse_infix_expression();
-      return new Prefix_syntax(tok, e);
+    case Token::return_tok:
+    case Token::throw_tok: {
+      Token kw = consume();
+      Syntax* s = parse_control_expression();
+      return new Prefix_syntax(kw, s);
     }
     default:
       break;
     }
-    return parse_infix_expression();
+    return parse_control_expression();
   }
 
-  /// Parse an expression.
+  /// Parse a control-expression.
   ///
-  ///   infix-expression:
-  ///     implication-expression
-  Syntax* Parser::parse_infix_expression()
+  ///   control-expression:
+  ///     assignment-expression
+  ///     conditional-expression
+  ///     case-expression
+  ///     loop-expression
+  ///     lambda-expression
+  ///     let-expression
+  Syntax* Parser::parse_control_expression()
   {
+    switch (lookahead()) {
+    case Token::if_tok:
+      return parse_conditional_expression();
+    case Token::case_tok:
+    case Token::switch_tok:
+      return parse_match_expression();
+    case Token::for_tok:
+    case Token::while_tok:
+    case Token::do_tok:
+      return parse_loop_expression();
+    default:
+      break;
+    }
     return parse_assignment_expression();
+  }
+
+  /// Parse a conditional-expression.
+  ///
+  ///   conditional-expression:
+  ///     if ( expression ) block-expression
+  ///     if ( expression ) block-expression else block-expression
+  Syntax* Parser::parse_conditional_expression()
+  {
+    Token ctrl = require(Token::if_tok);
+    expect(Token::lparen_tok);
+    Syntax* s0 = parse_expression();
+    expect(Token::rparen_tok);
+    Syntax* s1 = parse_block_expression();
+    
+    // Match the else part. Turn the body into a pair.
+    if (match(Token::else_tok)) {
+      Syntax* s2 = parse_block_expression();
+      s1 = new Pair_syntax(s1, s2);
+    }
+    return new Control_syntax(ctrl, s0, s1);
+  }
+
+  /// Parse a match-expression.
+  ///
+  ///   match-expression:
+  ///     case ( expression ) case-list
+  ///     switch ( expression ) case-list
+  Syntax* Parser::parse_match_expression()
+  {
+    assert(next_token_is(Token::case_tok) || next_token_is(Token::switch_tok));
+    Token ctrl = consume();
+    expect(Token::lparen_tok);
+    Syntax* s0 = parse_expression();
+    expect(Token::rparen_tok);
+    Syntax* s1 = parse_case_list();
+    return new Control_syntax(ctrl, s0, s1);
+  }
+
+  /// Parses a case-list.
+  ///
+  ///   case-list:
+  ///     case
+  ///     case-list else case
+  Syntax* Parser::parse_case_list()
+  {
+    std::vector<Syntax*> cs;
+    parse_item(*this, &Parser::parse_case, cs);
+    while (match(Token::else_tok))
+      parse_item(*this, &Parser::parse_case, cs);
+    return new List_syntax(std::move(cs));
+  }
+
+  /// Parse a case in a match-expression:
+  ///
+  ///   case:
+  ///     pattern-list? => block-expression
+  Syntax* Parser::parse_case()
+  {
+    Syntax* s0 = nullptr;
+    if (next_token_is_not(Token::equal_greater_tok))
+      s0 = parse_pattern_list();
+    Token op = expect(Token::equal_greater_tok);
+    Syntax* s1 = parse_block_expression();
+    return new Infix_syntax(op, s0, s1);
+  }
+
+  /// Parse a pattern-list.
+  ///
+  ///   pattern-list:
+  ///     pattern
+  ///     pattern-list , pattern
+  Syntax* Parser::parse_pattern_list()
+  {
+    std::vector<Syntax*> ps;
+    parse_item(*this, &Parser::parse_pattern, ps);
+    while (match(Token::comma_tok))
+      parse_item(*this, &Parser::parse_pattern, ps);
+    return new List_syntax(std::move(ps));
+  }
+
+  /// Parse a pattern.
+  ///
+  ///   pattern:
+  ///     prefix-expression
+  ///
+  /// A pattern describes a set of types or values.
+  Syntax* Parser::parse_pattern()
+  {
+    return parse_prefix_expression();
+  }
+
+  /// Parse a loop expression.
+  ///
+  ///   loop-expression:
+  ///     for ( declarator type-clause in expression ) block-expression
+  ///     while ( expression ) block-expression
+  ///     do block-expression while ( condition )
+  ///     do block-expression
+  Syntax* Parser::parse_loop_expression()
+  {
+    switch (lookahead()) {
+    case Token::for_tok:
+    case Token::while_tok:
+    case Token::do_tok:
+    default:
+      break;
+    }
+    assert(false);
+  }
+
+  /// Parse a for loop.
+  ///
+  ///   loop-expression:
+  ///     for ( declarator descriptor-clause in expression ) block-expression
+  ///
+  /// The declaration in the parameter list is similar to normal parameters
+  /// except that the `=` is replaced by `in`.
+  ///
+  /// TODO: Can we generalize the syntax for multiple parameters? What would
+  /// it mean? There are a few options (zip vs. cross). Note that these
+  /// don't group like other parameters.
+  Syntax* Parser::parse_for_expression()
+  {
+    Token ctrl = require(Token::for_tok);
+    expect(Token::lparen_tok);
+    Syntax* id = parse_declarator();
+    Descriptor_clause dc = parse_descriptor_clause(*this);
+    expect(Token::in_tok);
+    Syntax* init = parse_expression();
+    Syntax* decl = new Declaration_syntax(id, dc.type, dc.cons, init);
+    expect(Token::rparen_tok);
+    Syntax* body = parse_block_expression();
+    return new Control_syntax(ctrl, decl, body);
+  }
+
+  ///   loop-expression:
+  ///     while ( expression ) block-expression
+  Syntax* Parser::parse_while_expression()
+  {
+    Token ctrl = require(Token::while_tok);
+    expect(Token::lparen_tok);
+    Syntax* s0 = parse_expression();
+    expect(Token::rparen_tok);
+    Syntax* s1 = parse_block_expression();
+    return new Control_syntax(ctrl, s0, s1);
+  }
+
+  /// Parse a do/do-while expression.
+  ///
+  ///   loop-expression:
+  ///     do block-expression while ( condition )
+  ///     do block-expression
+  ///
+  /// Note that the "head" of the do expression appears after the body
+  /// of the loop (if it appears at all).
+  Syntax* Parser::parse_do_expression()
+  {
+    Token ctrl = require(Token::do_tok);
+    Syntax* s1 = parse_block_expression();
+    Syntax* s0 = nullptr;
+    if (match(Token::while_tok)) {
+      expect(Token::lparen_tok);
+      s0 = parse_expression();
+      expect(Token::rparen_tok);
+    }
+    return new Control_syntax(ctrl, s0, s1);
+  }
+
+  /// Parse a lambda-expression.
+  ///
+  ///   lambda-expression:
+  ///     lambda capture? descriptor constraint? => block-expression
+  ///
+  /// The capture, descriptor, and constraint comprise the head and are
+  /// stored in a triple.
+  Syntax* Parser::parse_lambda_expression()
+  {
+    Token ctrl = require(Token::lambda_tok);
+    Syntax* cap = nullptr;
+    if (next_token_is(Token::lbrace_tok))
+      cap = parse_capture();
+    Syntax* desc = parse_descriptor();
+    Syntax* cons = nullptr;
+    if (next_token_is(Token::is_tok))
+      cons = parse_constraint();
+    expect(Token::equal_greater_tok);
+    Syntax* body = parse_block_expression();
+    Syntax* head = new Triple_syntax(cap, desc, cons);
+    return new Control_syntax(ctrl, head, body);
+  }
+
+  /// Parse a lambda capture.
+  ///
+  ///   capture:
+  ///     block-statement
+  Syntax* Parser::parse_capture()
+  {
+    return parse_block_statement();
+  }
+
+  /// Parse a block-expression.
+  ///
+  ///   block-expression:
+  ///     expression
+  ///     block
+  Syntax* Parser::parse_block_expression()
+  {
+    if (next_token_is(Token::lbrace_tok))
+      return parse_block();
+    return parse_expression();
+  }
+
+  /// Parse a block.
+  ///
+  ///   block:
+  ///     block-statement
+  Syntax* Parser::parse_block()
+  {
+    return parse_block_statement();
   }
 
   /// Parse an assignment.
@@ -405,37 +682,41 @@ namespace beaker
     return e0;
   }
 
-  /// Returns true if we're at the start of a parameter list.
-  static bool is_parameter_list(Parser& p)
+  static bool is_open_token(Token::Kind k)
   {
-    assert(p.next_token_is(Token::lparen_tok) || p.next_token_is(Token::lbracket_tok));
-
-    // Match an empty parameter list.
-    if (p.nth_token_is(1, Token::rparen_tok))
+    switch (k) {
+    case Token::lparen_tok:
+    case Token::lbracket_tok:
+    case Token::lbrace_tok:
       return true;
+    default:
+      return false;
+    }
+  }
 
-    // Otherwise, look to see if this contains a definition of one or more
-    // parameters.
-    return starts_definition(p, 1);
+  static bool is_close_token(Token::Kind k)
+  {
+    switch (k) {
+    case Token::rparen_tok:
+    case Token::rbracket_tok:
+    case Token::rbrace_tok:
+      return true;
+    default:
+      return false;
+    }
   }
 
   /// Find the matching offset of the current token.
-  ///
-  /// FIXME: With parameter groups, this isn't quite right. We need to
-  /// skim over all top-level commas, looking parameters.
-  ///
-  /// TODO: It might be worthwhile combining this and the function below.
-  /// Otherwise, we have multiple scans over the same tokens.
-  static std::size_t find_matching(Parser& p, Token::Kind k1, Token::Kind k2)
+  static std::size_t find_matched(Parser& p, Token::Kind open, Token::Kind close)
   {
-    assert(p.lookahead() == k1);
+    assert(p.lookahead() == open);
     std::size_t la = 0;
     std::size_t braces = 0;
     while (Token::Kind k = p.lookahead(la)) {
-      if (k == k1) {
+      if (is_open_token(k)) {
         ++braces;
       }
-      else if (k == k2) {
+      else if (is_close_token(k)) {
         --braces;
         if (braces == 0)
           break;
@@ -448,12 +729,9 @@ namespace beaker
   // An lparen starts a prefix operator if the first few tokens start a
   // prefix operator, and the entire enclosure is not followed by something
   // that is eithe a primary expression or other prefix operator.
-  static bool is_prefix_operator(Parser& p)
+  static bool is_prefix_operator(Parser& p, Token::Kind open, Token::Kind close)
   {
-    if (!is_parameter_list(p))
-      return false;
-
-    std::size_t la = find_matching(p, Token::lparen_tok, Token::rparen_tok);
+    std::size_t la = find_matched(p, open, close);
     switch (p.lookahead(la + 1)) {
       // Primary expressions.
       case Token::true_tok:
@@ -479,11 +757,53 @@ namespace beaker
     return false;
   }
 
+  /// Contains information about the lexical structure of a potential prefix
+  /// operator.
+  struct Enclosure_characterization
+  {
+    /// True if we have `()` or `[]`.
+    bool is_empty = false;
+
+    /// True if the non-empty contents are `:t`, `x:t`, or `x0, ..., xn:t`.
+    bool has_parameters = false;
+    
+    /// True if the token following the closing `)` or `]` starts a prefix
+    /// or primary expression.
+    bool is_operator = false;
+  };
+
+  // For a term like `@ parameter-group | expression-list @`, determine some
+  // essential properties.
+  Enclosure_characterization characterize_prefix_op(Parser& p)
+  {
+    assert(p.next_token_in({Token::lparen_tok, Token::lbracket_tok}));
+
+    // Get the matching token kinds.
+    Token::Kind open = p.lookahead();
+    Token::Kind close = open == Token::lparen_tok
+      ? Token::rparen_tok 
+      : Token::rbracket_tok;
+    
+    Enclosure_characterization info;
+
+    // Characterize the enclosure.
+    if (p.nth_token_is(1, close))
+      info.is_empty = true;
+    else if (starts_definition(p, 1))
+      info.has_parameters = true;
+    
+    // Characterize the token after the enclosure.
+    info.is_operator = is_prefix_operator(p, open, close);
+
+    return info;
+  }
+
   /// Parse a prefix-expression.
   ///
   ///   prefix-expression:
   ///     postfix-expression
-  ///     [ expression-group? ] prefix-expression
+  ///     [ expression-list? ] prefix-expression
+  ///     [ parameter-group ] prefix-expression
   ///     ( parameter-group? ) prefix-expression
   ///     const prefix-expression
   ///     ^ prefix-expression
@@ -495,20 +815,20 @@ namespace beaker
     switch (lookahead())
     {
     case Token::lbracket_tok: {
-      bool templ = is_parameter_list(*this);
-      Syntax* bound = parse_bracket_group();
-      Syntax* type = parse_prefix_expression();
-      if (templ)
-        return new Template_syntax(bound, type);
-      return new Array_syntax(bound, type);
+      auto info = characterize_prefix_op(*this);
+      if (!info.is_operator)
+        break;
+      if (!info.is_empty && info.has_parameters)
+        return parse_template_constructor();
+      else
+        return parse_array_constructor();
     }
 
     case Token::lparen_tok: {
-      if (!is_prefix_operator(*this))
+      auto info = characterize_prefix_op(*this);
+      if (!info.is_operator)
         break;
-      Syntax* parms = parse_paren_list();
-      Syntax* result = parse_prefix_expression();
-      return new Function_syntax(parms, result);
+      return parse_function_constructor();
     }
 
     case Token::const_tok:
@@ -527,6 +847,39 @@ namespace beaker
     return parse_postfix_expression();
   }
 
+  /// Parse a template type constructor.
+  ///
+  ///   prefix-expression:
+  ///     [ parameter-group ] prefix-expression
+  Syntax* Parser::parse_template_constructor()
+  {
+    Syntax* op = parse_bracket_enclosed(&Parser::parse_parameter_group);
+    Syntax* type = parse_prefix_expression();
+    return new Template_syntax(op, type);
+  }
+
+  /// Parse an array type constructor.
+  ///
+  ///   prefix-expression:
+  ///     [ expression-list? ] prefix-expression
+  Syntax* Parser::parse_array_constructor()
+  {
+    Syntax* op = parse_bracket_enclosed(&Parser::parse_expression_list);
+    Syntax* type = parse_prefix_expression();
+    return new Array_syntax(op, type);
+  }
+
+  /// Parse a template type constructor.
+  ///
+  ///   prefix-expression:
+  ///     ( parameter-group? ) prefix-expression
+  Syntax* Parser::parse_function_constructor()
+  {
+    Syntax* op = parse_paren_enclosed(&Parser::parse_parameter_group);
+    Syntax* type = parse_prefix_expression();
+    return new Template_syntax(op, type);
+  }
+
   /// Parse a postfix-expression.
   ///
   ///   postfix-expression:
@@ -541,11 +894,11 @@ namespace beaker
     while (true)
     {
       if (next_token_is(Token::lparen_tok)) {
-        Syntax* args = parse_paren_list();
+        Syntax* args = parse_paren_enclosed(&Parser::parse_expression_list);
         e0 = new Call_syntax(e0, args);
       }
       else if (next_token_is(Token::lbracket_tok)) {
-        Syntax* args = parse_bracket_list();
+        Syntax* args = parse_bracket_enclosed(&Parser::parse_expression_list);
         e0 = new Call_syntax(e0, args);
       }
       else if (Token dot = match(Token::dot_tok)) {
@@ -561,12 +914,42 @@ namespace beaker
     return e0;
   }
 
+  // For a term like `@ parameter-group | expression-list @`, determine some
+  // essential properties. This is basically the same as the characterize
+  // function above, except that it doesn't look past the end of the
+  // enclosure.
+  Enclosure_characterization characterize_primary_expr(Parser& p)
+  {
+    assert(p.next_token_in({Token::lparen_tok, Token::lbracket_tok}));
+
+    // Get the matching token kinds.
+    Token::Kind open = p.lookahead();
+    Token::Kind close = open == Token::lparen_tok
+      ? Token::rparen_tok 
+      : Token::rbracket_tok;
+
+    Enclosure_characterization info;
+
+    // Characterize the enclosure.
+    if (p.nth_token_is(1, close))
+      info.is_empty = true;
+    else if (starts_definition(p, 1))
+      info.has_parameters = true;
+
+    return info;
+  }
+
   /// Parse a primary expression.
   ///
   ///   primary-expression:
   ///     literal
   ///     id-expression
   ///     ( expression-list? )
+  ///     ( parameter-group? )
+  ///     [ parameter-group? ]
+  ///
+  /// The enclosed parameter groups exist to allow the omission of the result
+  /// type of template and function type constructors.
   Syntax* Parser::parse_primary_expression()
   {
     switch (lookahead()) {
@@ -585,8 +968,15 @@ namespace beaker
     case Token::identifier_tok:
       return parse_id_expression();
 
-    case Token::lparen_tok:
-      return parse_paren_list();
+    case Token::lparen_tok: {
+      auto info = characterize_prefix_op(*this);
+      if (!info.is_empty && info.has_parameters)
+        return parse_paren_enclosed(&Parser::parse_parameter_group);
+      return parse_paren_enclosed(&Parser::parse_expression_list);
+    }
+
+    case Token::lbracket_tok:
+      return parse_bracket_enclosed(&Parser::parse_parameter_group);
     
     default:
       break;
@@ -610,116 +1000,20 @@ namespace beaker
     return new Identifier_syntax(id);
   }
 
-  /// Parse a paren-enclosed group.
-  ///
-  ///   paren-group:
-  ///     ( expression-group? )
-  Syntax* Parser::parse_paren_group()
-  {
-    return parse_enclosed<Enclosure::parens>(&Parser::parse_expression_group);
-  }
-
-  /// Parse a paren-enclosed list.
-  ///
-  ///   paren-list:
-  ///     ( expression-list? )
-  Syntax* Parser::parse_paren_list()
-  {
-    return parse_enclosed<Enclosure::parens>(&Parser::parse_expression_list);
-  }
-
-  /// Parse a bracket-enclosed group.
-  ///
-  ///   bracket-group:
-  ///     [ expression-group? ]
-  Syntax* Parser::parse_bracket_group()
-  {
-    return parse_enclosed<Enclosure::brackets>(&Parser::parse_expression_group);
-  }
-
-  /// Parse a bracket-enclosed list.
-  ///
-  ///   bracket-list:
-  ///     [ expression-list? ]
-  Syntax* Parser::parse_bracket_list()
-  {
-    return parse_enclosed<Enclosure::brackets>(&Parser::parse_expression_list);
-  }
-
-  /// Returns a list defining the group.
-  static Syntax* make_group(Syntax_seq& ts)
-  {
-    // This only happens when there's an error and we can't accumulate
-    // a group. If we propagate errors, this shouldn't happen at all.
-    if (ts.empty())
-      return nullptr;    
-
-    // Don't allocate groups if there's only one present.    
-    if (ts.size() == 1)
-      return ts[0];
-
-    return new List_syntax(std::move(ts));
-  }
-
-  /// Parse an expression-group.
-  ///
-  ///   expression-group:
-  ///     expression-list
-  ///     expression-group ; expression-list
-  ///
-  /// Groups are only created if multiple groups are present.
-  Syntax* Parser::parse_expression_group()
-  {
-    Syntax_seq ts;
-    parse_item(*this, &Parser::parse_expression_list, ts);
-    while (match(Token::semicolon_tok))
-      parse_item(*this, &Parser::parse_expression_list, ts);
-    return make_group(ts);
-  }
-
-  // Returns a list for `ts`.
-  static Syntax* make_list(Syntax_seq& ts)
-  {
-    // This only happens when an error occurred.
-    if (ts.empty())
-      return nullptr;
-
-    return new List_syntax(std::move(ts));
-  }
-
   /// Parse an expression-list.
   ///
   ///   expression-list:
-  ///     parameter-expression
-  ///     expression-list , parameter-expression
+  ///     expression
+  ///     expression-list , expression
   ///
   /// This always returns a list, even if there's a single element.
   Syntax* Parser::parse_expression_list()
   {
     Syntax_seq ts;
-    parse_item(*this, &Parser::parse_parameter_or_expression, ts);
+    parse_item(*this, &Parser::parse_expression, ts);
     while (match(Token::comma_tok))
-      parse_item(*this, &Parser::parse_parameter_or_expression, ts);
-    return make_list(ts);
-  }
-
-  /// Returns true if `p` starts a parameter declaration.
-  static bool starts_parameter(Parser& p)
-  {
-    return p.next_token_is(Token::colon_tok) ||
-           p.next_tokens_are(Token::identifier_tok, Token::colon_tok);
-  }
-
-  /// Parse a parameter or expression.
-  ///
-  ///   parameter-expression:
-  ///     parameter
-  ///     expression
-  Syntax* Parser::parse_parameter_or_expression()
-  {
-    if (starts_parameter(*this))
-      return parse_parameter();
-    return parse_expression();
+      parse_item(*this, &Parser::parse_expression, ts);
+    return new List_syntax(std::move(ts));
   }
 
   /// Returns a list defining the group.
@@ -779,6 +1073,45 @@ namespace beaker
     return make_parameter_list(ts);
   }
 
+  /// Parser a parameter:
+  ///
+  ///   parameter:
+  ///     identifier : type
+  ///     identifier : type = expression
+  ///     identifeir : = expression
+  ///     : type
+  ///     : type = expression
+  ///
+  /// TODO: Can parameters have introducers?
+  ///
+  /// TODO: Can paramters be packs (yes, but what's the syntax?).
+  Syntax* Parser::parse_parameter()
+  {
+    // Match unnamed variants.
+    if (match(Token::colon_tok)) {
+      Syntax* type = parse_descriptor();
+      Syntax* init = nullptr;
+      if (match(Token::equal_tok))
+        init = parse_expression();
+      return new Declaration_syntax(nullptr, type, nullptr, init);
+    }
+
+    // Match the identifier...
+    Syntax* id = parse_id_expression();
+    
+    // ... And optional declarative information
+    Syntax* type = nullptr;
+    Syntax* init = nullptr;
+    if (match(Token::colon_tok)) {
+      if (next_token_is_not(Token::equal_tok))
+        type = parse_descriptor();
+      if (match(Token::equal_tok))
+        init = parse_expression();
+    }
+
+    return new Declaration_syntax(id, type, nullptr, init);
+  }
+
   /// Parse a brace-enclosed list.
   ///
   ///   brace-list:
@@ -822,7 +1155,7 @@ namespace beaker
   ///     { statement-seq }
   Syntax* Parser::parse_block_statement()
   {
-    return parse_brace_list();
+    return parse_brace_enclosed(&Parser::parse_statement_seq);
   }
 
   /// Parse a declaration-statement.

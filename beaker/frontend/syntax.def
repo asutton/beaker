@@ -20,6 +20,7 @@
 def_abstract(Unary, Syntax)
 def_abstract(Binary, Syntax)
 def_abstract(Ternary, Syntax)
+def_abstract(Quaternary, Syntax)
 def_abstract(Multiary, Syntax)
 
 // Atomic nodes
@@ -31,6 +32,8 @@ def_syntax(Identifier, Atom)
 def_syntax(List, Multiary)
 def_syntax(Sequence, Multiary)
 def_syntax(Enclosure, Unary)
+def_syntax(Pair, Binary)
+def_syntax(Triple, Ternary)
 
 // Unary prefix operators (e.g., ^t)
 def_syntax(Prefix, Unary)
@@ -52,8 +55,11 @@ def_syntax(Index, Application)
 // Infix binary operators (e.g., x + y).
 def_syntax(Infix, Binary)
 
-// A triple of declarator, type, and definition.
-def_syntax(Declaration, Ternary)
+// Control structures
+def_syntax(Control, Binary)
+
+// Named declarations
+def_syntax(Declaration, Quaternary)
 
 // Top-level
 def_syntax(File, Unary)

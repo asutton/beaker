@@ -23,8 +23,8 @@ namespace beaker
 
   namespace
   {
-    // NOTE: We can technically deduce R from V, but should we? It doesn't
-    // really improve clarity.
+    // TODO: It would be nice if I could define this generically instead of
+    // using named overloads.
     template<Visitor_type V, typename R>
     struct Children_visitor : Syntax_visitor_base<Children_visitor<V, R>, V, R>
     {
@@ -52,7 +52,12 @@ namespace beaker
       {
         return s->operands();
       }
-    
+
+      R visit_Quaternary(Ptr<Quaternary_syntax> s)
+      {
+        return s->operands();
+      }
+
       R visit_Multiary(Ptr<Multiary_syntax> s)
       {
         return s->operands();
@@ -172,7 +177,9 @@ namespace beaker
       // The range of a file is that of its declaration sequence.
       Source_range visit_File(File_syntax const* s)
       {
-        return s->declarations()->location();
+        if (Syntax* ds = s->declarations())
+          return ds->location();
+        return {};
       }
     };
   } // namespace

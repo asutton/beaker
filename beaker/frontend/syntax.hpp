@@ -65,10 +65,45 @@ namespace beaker
   // intent is to simplify some algorithms that can be largely defined in
   // terms of the tree's structure, and not its interpretation.
 
-  /// A unary expression has a single operand.
-  struct Unary_syntax : Syntax
+  /// A node with a fixed number of operands.
+  template<std::size_t N>
+  struct Kary_syntax : Syntax
   {
-    Unary_syntax(Kind k, Syntax* s)
+    static_assert(N > 0);
+
+    template<typename... Ts>
+    Kary_syntax(Kind k, Ts*... ts)
+      : Syntax(k), m_terms{ts...}
+    {
+      static_assert(sizeof...(Ts) == N);
+    }
+
+    /// Returns the nth operand.
+    Syntax* operand(std::size_t n) const
+    {
+      return m_terms[n];
+    }
+
+    /// Returns the operands.
+    Const_syntax_span operands() const
+    {
+      return m_terms;
+    }
+
+    /// Returns the operands.
+    Syntax_span operands()
+    {
+      return m_terms;
+    }
+
+    Syntax* m_terms[N];
+  };
+
+  /// Specialization for unary nodes.
+  template<>
+  struct Kary_syntax<1> : Syntax
+  {
+    Kary_syntax(Kind k, Syntax* s)
       : Syntax(k), m_term(s)
     { }
 
@@ -93,90 +128,36 @@ namespace beaker
     Syntax* m_term;
   };
 
-  /// A binary expression with two operands.
-  struct Binary_syntax : Syntax
+  /// A unary expression has a single operand.
+  struct Unary_syntax : Kary_syntax<1>
   {
-    Binary_syntax(Kind k, Syntax* s0, Syntax* s1)
-      : Syntax(k), m_terms{s0, s1}
+    Unary_syntax(Kind k, Syntax* s)
+      : Kary_syntax<1>(k, s)
     { }
-
-    /// Returns the first operand.
-    Syntax* first() const
-    {
-      return m_terms[0];
-    }
-
-    /// Returns the second operand.
-    Syntax* second() const
-    {
-      return m_terms[1];
-    }
-
-    /// Returns the nth operand.
-    Syntax* operand(std::size_t n) const
-    {
-      return m_terms[n];
-    }
-
-    /// Returns the operands.
-    Const_syntax_span operands() const
-    {
-      return m_terms;
-    }
-
-    /// Returns the operands.
-    Syntax_span operands()
-    {
-      return m_terms;
-    }
-
-    Syntax* m_terms[2];
   };
 
-  /// A ternary expression with three operands.
-  struct Ternary_syntax : Syntax
+  /// A binary expression with two operands.
+  struct Binary_syntax : Kary_syntax<2>
+  {
+    Binary_syntax(Kind k, Syntax* s0, Syntax* s1)
+      : Kary_syntax<2>(k, s0, s1)
+    { }
+  };
+
+  /// A ternary expression.
+  struct Ternary_syntax : Kary_syntax<3>
   {
     Ternary_syntax(Kind k, Syntax* s0, Syntax* s1, Syntax* s2)
-      : Syntax(k), m_terms{s0, s1, s2}
+      : Kary_syntax<3>(k, s0, s1, s2)
     { }
+  };
 
-    /// Returns the first operand.
-    Syntax* first() const
-    {
-      return m_terms[0];
-    }
-
-    /// Returns the second operand.
-    Syntax* second() const
-    {
-      return m_terms[1];
-    }
-
-    /// Returns the third operand.
-    Syntax* third() const
-    {
-      return m_terms[2];
-    }
-
-    /// Returns the nth operand.
-    Syntax* operand(std::size_t n) const
-    {
-      return m_terms[n];
-    }
-
-    /// Returns the operands.
-    Const_syntax_span operands() const
-    {
-      return m_terms;
-    }
-
-    /// Returns the operands.
-    Syntax_span operands()
-    {
-      return m_terms;
-    }
-
-    Syntax* m_terms[3];
+  /// A quaternary expression.
+  struct Quaternary_syntax : Kary_syntax<4>
+  {
+    Quaternary_syntax(Kind k, Syntax* s0, Syntax* s1, Syntax* s2, Syntax* s3)
+      : Kary_syntax<4>(k, s0, s1, s2, s3)
+    { }
   };
 
   /// A term with an unspecified number of operands.
@@ -317,6 +298,26 @@ namespace beaker
     Token m_close;
   };
 
+  /// A pair of terms.
+  struct Pair_syntax : Binary_syntax
+  {
+    static constexpr Kind this_kind = Pair;
+
+    Pair_syntax(Syntax* s0, Syntax* s1)
+      : Binary_syntax(this_kind, s0, s1)
+    { }
+  };
+
+  /// A triple of terms.
+  struct Triple_syntax : Ternary_syntax
+  {
+    static constexpr Kind this_kind = Triple;
+
+    Triple_syntax(Syntax* s0, Syntax* s1, Syntax* s2)
+      : Ternary_syntax(this_kind, s0, s1, s2)
+    { }
+  };
+
   /// A unary prefix operator expression.
   struct Prefix_syntax : Unary_syntax
   {
@@ -346,13 +347,13 @@ namespace beaker
     /// or a parameter list.
     Syntax *constructor() const
     {
-      return first();
+      return operand(0);
     }
 
     /// Returns the result type of the constructor.
     Syntax *result() const
     {
-      return second();
+      return operand(1);
     }
   };
 
@@ -496,13 +497,55 @@ namespace beaker
     Token m_op;
   };
 
-  /// A declaration.
-  struct Declaration_syntax : Ternary_syntax
+  /// Control structures. Control structures are primarily defined by two
+  /// syntactic structures: head and body. The "head" part introduces variables,
+  /// defines conditons, etc. The "body" is the main sub-expression.
+  ///
+  /// TODO: We might need to expand this for specific kinds of control
+  /// structures. Lambda expressions don't readily fit the pattern unless we
+  /// encode them cleverly using pairs.
+  struct Control_syntax : Binary_syntax
+  {
+    static constexpr Kind this_kind = Control;
+
+    Control_syntax(Token t, Syntax* c, Syntax* b)
+      : Binary_syntax(this_kind, c, b), m_ctrl(t)
+    { }
+
+    /// Returns the infix operation (operator).
+    Token control() const
+    {
+      return m_ctrl;
+    }
+
+    /// Returns the head of the control.
+    Syntax* head() const
+    {
+      return m_terms[0];
+    }
+
+    /// Returns the body of the control.
+    Syntax* body() const
+    {
+      return m_terms[1];
+    }
+
+    Token m_ctrl;
+  };
+
+
+  /// A definition or parameter. It has:
+  ///
+  ///   - a declarator (either identifier or list thereof)
+  ///   - a type
+  ///   - a constraint
+  ///   - an initializer
+  struct Declaration_syntax : Quaternary_syntax
   {
     static constexpr Kind this_kind = Declaration;
 
-    Declaration_syntax(Syntax* d, Syntax* t, Syntax* i)
-      : Ternary_syntax(this_kind, d, t, i)
+    Declaration_syntax(Syntax* d, Syntax* t, Syntax* c, Syntax* i)
+      : Quaternary_syntax(this_kind, d, t, c, i)
     { }
 
     /// Returns the declarator.
@@ -516,11 +559,16 @@ namespace beaker
     {
       return operand(1);
     }
+
+    Syntax* constraint() const
+    {
+      return operand(2);
+    }
     
     /// Returns the initializer.
     Syntax* initializer() const
     {
-      return operand(2);
+      return operand(3);
     }
   };
 
@@ -548,7 +596,6 @@ namespace beaker
     const_visitor
   };
   
-
   /// Defines the structure of visitors. This is a CRTP class. D is the derived
   /// implementation. MF is a metafunction that when used as MF<T>::type yields
   /// a (possibly cv-qualified) pointer to T. R is the result type, and Parms is

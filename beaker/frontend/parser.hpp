@@ -73,6 +73,12 @@ namespace beaker
       return next_token_is(k1) && nth_token_is(1, k2);
     }
 
+    /// Returns true if the next token is any in the list `ks`.
+    bool next_token_in(std::initializer_list<Token::Kind> ks) const
+    {
+      return std::find(ks.begin(), ks.end(), lookahead()) != ks.end();
+    }
+
     /// Returns true if the next token does not have kind `k`.
     bool next_token_is_not(Token::Kind k) const
     {
@@ -141,21 +147,40 @@ namespace beaker
     // Declarations.
     Syntax* parse_declaration();
     Syntax* parse_definition();
-    Syntax* parse_parameter();
     Syntax* parse_declaration_seq();
 
     // Declarators.
     Syntax* parse_declarator();
     Syntax* parse_declarator_list();
 
-    // Types.
-    Syntax* parse_type();
+    // Descriptor.
+    Syntax* parse_descriptor();
+
+    // Constraints.
+    Syntax* parse_constraint();
 
     // Expressions, in general.
     Syntax* parse_expression();
-    
+
+    // Cotrol expressions.
+    Syntax* parse_leave_expression();
+    Syntax* parse_control_expression();
+    Syntax* parse_conditional_expression();
+    Syntax* parse_match_expression();
+    Syntax* parse_case_list();
+    Syntax* parse_case();
+    Syntax* parse_pattern_list();
+    Syntax* parse_pattern();
+    Syntax* parse_loop_expression();
+    Syntax* parse_for_expression();
+    Syntax* parse_while_expression();
+    Syntax* parse_do_expression();
+    Syntax* parse_lambda_expression();
+    Syntax* parse_capture();
+    Syntax* parse_block_expression();
+    Syntax* parse_block();
+
     // Infix expressions.
-    Syntax* parse_infix_expression();
     Syntax* parse_assignment_expression();
     Syntax* parse_implication_expression();
     Syntax* parse_logical_or_expression();
@@ -167,6 +192,9 @@ namespace beaker
     
     // Prefix expressions.
     Syntax* parse_prefix_expression();
+    Syntax* parse_template_constructor();
+    Syntax* parse_array_constructor();
+    Syntax* parse_function_constructor();
     
     // Postfix expressions.
     Syntax* parse_postfix_expression();
@@ -177,24 +205,21 @@ namespace beaker
     Syntax* parse_list_expression();
     Syntax* parse_id_expression();
 
-    // Helper grammars
-    Syntax* parse_paren_list();
-    Syntax* parse_paren_group();
-    Syntax* parse_bracket_list();
-    Syntax* parse_bracket_group();
-    Syntax* parse_expression_group();
     Syntax* parse_expression_list();
+
+    // Parameters.    
     Syntax* parse_parameter_group();
     Syntax* parse_parameter_list();
+    Syntax* parse_parameter();
+
     Syntax* parse_brace_list();
-    Syntax* parse_parameter_or_expression();
 
     // Statements
     Syntax* parse_statement();
+    Syntax* parse_statement_seq();
     Syntax* parse_block_statement();
     Syntax* parse_declaration_statement();
     Syntax* parse_expression_statement();
-    Syntax* parse_statement_seq();
 
     // Generic parsers and utilities
 
@@ -264,6 +289,24 @@ namespace beaker
         t = (this->*fn)();
       Token close = expect(close_token(E));
       return new Enclosure_syntax(open, close, t);
+    }
+
+    template<typename F>
+    Syntax* parse_paren_enclosed(F fn)
+    {
+      return parse_enclosed<Enclosure::parens>(fn);
+    }
+
+    template<typename F>
+    Syntax* parse_bracket_enclosed(F fn)
+    {
+      return parse_enclosed<Enclosure::brackets>(fn);
+    }
+
+    template<typename F>
+    Syntax* parse_brace_enclosed(F fn)
+    {
+      return parse_enclosed<Enclosure::braces>(fn);
     }
 
     // Diagnostics
