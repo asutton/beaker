@@ -166,6 +166,13 @@ namespace beaker
         return {start, end};
       }
 
+      Source_range visit_Control(Control_syntax const* s)
+      {
+        Source_location start = s->control().start_location();
+        Source_location end = s->body()->location().end;
+        return {start, end};
+      }
+
       // The range of declarations depends on the declarative form.
       Source_range visit_Declaration(Declaration_syntax const* s)
       {
@@ -201,6 +208,11 @@ namespace beaker
         : os(os)
       { }
 
+      void visit_Enclosure(Enclosure_syntax const* s)
+      {
+        os << " kind=" << '\'' << s->open().spelling() << s->close().spelling() << '\'';
+      }
+
       void visit_Literal(Literal_syntax const* s)
       {
         os << " value=" << '\'' << s->spelling() << '\'';
@@ -223,12 +235,12 @@ namespace beaker
 
       void visit_Infix(Infix_syntax const* s)
       {
-        os << " operator=" << '\'' << s->operation().spelling( )<< '\'';
+        os << " operator=" << '\'' << s->operation().spelling() << '\'';
       }
 
-      void visit_Enclosure(Enclosure_syntax const* s)
+      void visit_Control(Control_syntax const* s)
       {
-        os << " kind=" << '\'' << s->open().spelling() << s->close().spelling() << '\'';
+        os << " kind=" << '\'' << s->control().spelling() << '\'';
       }
 
       std::ostream& os;

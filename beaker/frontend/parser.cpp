@@ -86,65 +86,10 @@ namespace beaker
     return starts_definition(p, 0);
   }
 
-  namespace
-  {
-    struct Descriptor_clause
-    {
-      Syntax* type = {};
-      Syntax* cons = {};
-    };
-
-    // Parse a descriptor clause.
-    //
-    //   descriptor-clause: 
-    //     : descriptor constraint? 
-    //     : constraint? 
-    //
-    //   constraint:
-    //     is pattern
-    Descriptor_clause parse_descriptor_clause(Parser& p)
-    {
-      Descriptor_clause dc;
-      p.expect(Token::colon_tok);
-      if (p.next_token_is(Token::is_tok)) {
-        dc.cons = p.parse_constraint();
-      }
-      else {
-        dc.type = p.parse_descriptor();
-        if (p.next_token_is(Token::is_tok))
-          dc.cons = p.parse_constraint();
-      }
-      return dc;
-    }
-
-    struct Initializer_clause
-    {
-      Syntax* init = {};
-    };
-
-    //   initializer-clause: 
-    //     ; 
-    //     = expression ; 
-    //     = block-statement
-    Initializer_clause parse_initializer_clause(Parser& p)
-    {
-      Initializer_clause clause;
-      p.expect(Token::equal_tok);
-      if (p.next_token_is(Token::lbrace_tok)) {
-        clause.init = p.parse_block_statement();
-      }
-      else {
-        clause.init = p.parse_expression();
-        p.expect(Token::semicolon_tok);
-      }
-      return clause;
-    }
-  } // namespace
-
   /// Definition declaration:
   ///
   ///   definition-declaration:
-  ///     declarator-list? type-clause initializer-clause 
+  ///     declarator-list? descriptor-clause initializer-clause 
   ///
   ///   type-clause: 
   ///     : type constraint? 
@@ -165,15 +110,38 @@ namespace beaker
   ///     block-statement 
   Syntax* Parser::parse_definition()
   {
-    // Parse the declarator-list.
+    // declarator-list.
     Syntax* decl = nullptr;
     if (next_token_is_not(Token::colon_tok))
       decl = parse_declarator_list();
 
-    Descriptor_clause dc = parse_descriptor_clause(*this);
-    Initializer_clause ic = parse_initializer_clause(*this);
+    // descriptor-clause
+    Syntax* desc = nullptr;
+    Syntax* cons = nullptr;
+    expect(Token::colon_tok);
+    if (next_token_is_not(Token::equal_tok)) {
+      if (next_token_is(Token::is_tok)) {
+        cons = parse_constraint();
+      }
+      else if (next_token_is_not(Token::equal_tok)) {
+        desc = parse_descriptor();
+        if (next_token_is(Token::is_tok))
+          cons = parse_constraint();
+      }
+    }
 
-    return new Declaration_syntax(decl, dc.type, dc.cons, ic.init);
+    // initializer-clause
+    Syntax* init = nullptr;
+    expect(Token::equal_tok);
+    if (next_token_is(Token::lbrace_tok)) {
+      init = parse_block_statement();
+    }
+    else {
+      init = parse_expression();
+      expect(Token::semicolon_tok);
+    }
+
+    return new Declaration_syntax(decl, desc, cons, init);
   }
 
   /// Builds the declarator list.
@@ -449,10 +417,26 @@ namespace beaker
     Token ctrl = require(Token::for_tok);
     expect(Token::lparen_tok);
     Syntax* id = parse_declarator();
-    Descriptor_clause dc = parse_descriptor_clause(*this);
+
+    // descriptor-clause
+    Syntax* desc = nullptr;
+    Syntax* cons = nullptr;
+    expect(Token::colon_tok);
+    if (next_token_is_not(Token::equal_tok)) {
+      if (next_token_is(Token::is_tok)) {
+        cons = parse_constraint();
+      }
+      else if (next_token_is_not(Token::in_tok)) {
+        desc = parse_descriptor();
+        if (next_token_is(Token::is_tok))
+          cons = parse_constraint();
+      }
+    }
+
+    // in expression
     expect(Token::in_tok);
     Syntax* init = parse_expression();
-    Syntax* decl = new Declaration_syntax(id, dc.type, dc.cons, init);
+    Syntax* decl = new Declaration_syntax(id, desc, cons, init);
     expect(Token::rparen_tok);
     Syntax* body = parse_block_expression();
     return new Control_syntax(ctrl, decl, body);
@@ -1012,9 +996,10 @@ namespace beaker
   Syntax* Parser::parse_primary_expression()
   {
     switch (lookahead()) {
-      // Value literals
+    // Value literals
     case Token::true_tok:
     case Token::false_tok:
+    case Token::integer_tok:
     // Type literals
     case Token::int_tok:
     case Token::bool_tok:
