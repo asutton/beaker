@@ -155,6 +155,7 @@ namespace beaker
 
     // Descriptor.
     Syntax* parse_descriptor();
+    Syntax* parse_mapping_descriptor();
 
     // Constraints.
     Syntax* parse_constraint();
@@ -177,6 +178,7 @@ namespace beaker
     Syntax* parse_do_expression();
     Syntax* parse_lambda_expression();
     Syntax* parse_capture();
+    Syntax* parse_let_expression();
     Syntax* parse_block_expression();
     Syntax* parse_block();
 

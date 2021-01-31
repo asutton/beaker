@@ -231,6 +231,18 @@ namespace beaker
     return parse_prefix_expression();
   }
 
+  /// Parse a mapping descriptor.
+  ///
+  ///   mapping-descriptor:
+  ///     [ parameter-group ] prefix-expression
+  ///     ( parameter-group ) prefix-expression
+  Syntax* Parser::parse_mapping_descriptor()
+  {
+    assert(next_token_in({Token::lparen_tok, Token::lbracket_tok}));
+    return parse_prefix_expression();
+  }
+
+
   /// Parse a constraint.
   ///
   ///   constraint-clause:
@@ -302,6 +314,10 @@ namespace beaker
     case Token::while_tok:
     case Token::do_tok:
       return parse_loop_expression();
+    case Token::lambda_tok:
+      return parse_lambda_expression();
+    case Token::let_tok:
+      return parse_let_expression();
     default:
       break;
     }
@@ -475,25 +491,100 @@ namespace beaker
     return new Control_syntax(ctrl, s0, s1);
   }
 
+  static bool is_open_token(Token::Kind k)
+  {
+    switch (k) {
+    case Token::lparen_tok:
+    case Token::lbracket_tok:
+    case Token::lbrace_tok:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  static bool is_close_token(Token::Kind k)
+  {
+    switch (k) {
+    case Token::rparen_tok:
+    case Token::rbracket_tok:
+    case Token::rbrace_tok:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  /// Find the matching offset of the current token.
+  static std::size_t find_matched(Parser& p, Token::Kind open, Token::Kind close)
+  {
+    assert(p.lookahead() == open);
+    std::size_t la = 0;
+    std::size_t braces = 0;
+    while (Token::Kind k = p.lookahead(la)) {
+      if (is_open_token(k)) {
+        ++braces;
+      }
+      else if (is_close_token(k)) {
+        --braces;
+        if (braces == 0)
+          break;
+      }
+      ++la;
+    }
+    return la;
+  }
+
+  // Returns true if the current sequnce of tokens a capture block.
+  static bool is_capture(Parser& p)
+  {
+    assert(p.next_token_is(Token::lbrace_tok));
+    std::size_t la = find_matched(p, Token::lbrace_tok, Token::rbrace_tok);
+    switch (p.lookahead(la + 1)) {
+    case Token::lparen_tok:
+    case Token::lbracket_tok:
+    case Token::is_tok:
+    case Token::equal_greater_tok:
+      return true;
+    default:
+      break;
+    }
+    return false;
+  }
+
   /// Parse a lambda-expression.
   ///
   ///   lambda-expression:
-  ///     lambda capture? descriptor constraint? => block-expression
+  ///     lambda capture? mapping-descriptor constraint? => block-expression
+  ///     lambda block-expression
   ///
   /// The capture, descriptor, and constraint comprise the head and are
   /// stored in a triple.
   Syntax* Parser::parse_lambda_expression()
   {
     Token ctrl = require(Token::lambda_tok);
+
     Syntax* cap = nullptr;
     if (next_token_is(Token::lbrace_tok))
+    {
+      if (!is_capture(*this)) {
+        Syntax* body = parse_block_expression();
+        return new Control_syntax(ctrl, nullptr, body);
+      }
       cap = parse_capture();
-    Syntax* desc = parse_descriptor();
+    }
+    
+    Syntax* desc = nullptr;
+    if (next_token_in({Token::lparen_tok, Token::lbracket_tok}))
+      desc = parse_mapping_descriptor();
+
     Syntax* cons = nullptr;
     if (next_token_is(Token::is_tok))
       cons = parse_constraint();
+
     expect(Token::equal_greater_tok);
     Syntax* body = parse_block_expression();
+
     Syntax* head = new Triple_syntax(cap, desc, cons);
     return new Control_syntax(ctrl, head, body);
   }
@@ -505,6 +596,18 @@ namespace beaker
   Syntax* Parser::parse_capture()
   {
     return parse_block_statement();
+  }
+
+  /// Parse a let expression.
+  ///
+  ///   let-expression:
+  ///     let ( parameter-group ) block-or-expression
+  Syntax* Parser::parse_let_expression()
+  {
+    Token ctrl = require(Token::let_tok);
+    Syntax* head = parse_paren_enclosed(&Parser::parse_parameter_group);
+    Syntax* body = parse_block_expression();
+    return new Control_syntax(ctrl, head, body);
   }
 
   /// Parse a block-expression.
@@ -680,50 +783,6 @@ namespace beaker
       e0 = new Infix_syntax(op, e0, e1);
     }
     return e0;
-  }
-
-  static bool is_open_token(Token::Kind k)
-  {
-    switch (k) {
-    case Token::lparen_tok:
-    case Token::lbracket_tok:
-    case Token::lbrace_tok:
-      return true;
-    default:
-      return false;
-    }
-  }
-
-  static bool is_close_token(Token::Kind k)
-  {
-    switch (k) {
-    case Token::rparen_tok:
-    case Token::rbracket_tok:
-    case Token::rbrace_tok:
-      return true;
-    default:
-      return false;
-    }
-  }
-
-  /// Find the matching offset of the current token.
-  static std::size_t find_matched(Parser& p, Token::Kind open, Token::Kind close)
-  {
-    assert(p.lookahead() == open);
-    std::size_t la = 0;
-    std::size_t braces = 0;
-    while (Token::Kind k = p.lookahead(la)) {
-      if (is_open_token(k)) {
-        ++braces;
-      }
-      else if (is_close_token(k)) {
-        --braces;
-        if (braces == 0)
-          break;
-      }
-      ++la;
-    }
-    return la;
   }
 
   // An lparen starts a prefix operator if the first few tokens start a
@@ -960,7 +1019,10 @@ namespace beaker
     // Type literals
     case Token::int_tok:
     case Token::bool_tok:
-    case Token::type_tok: {
+    case Token::type_tok: 
+    // Control primitives
+    case Token::continue_tok:
+    case Token::break_tok: {
       Token value = consume();
       return new Literal_syntax(value);
     }
