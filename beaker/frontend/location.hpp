@@ -20,7 +20,13 @@ namespace beaker
   struct Source_location
   {
     std::size_t line = {};
-    std::size_t column = {};;
+    std::size_t column = {};
+
+    /// Converts to true if the location is valid.
+    explicit operator bool () const
+    {
+      return is_valid();
+    }
 
     /// Returns true if the location is valid.
     bool is_valid() const
@@ -47,6 +53,12 @@ namespace beaker
       : start(s), end(e)
     {
       assert(s.is_valid() == e.is_valid());
+    }
+
+    /// Converts to true if the range is valid.
+    explicit operator bool () const
+    {
+      return is_valid();
     }
 
     /// Returns true if the range is valid.

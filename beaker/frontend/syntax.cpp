@@ -264,7 +264,8 @@ namespace beaker
         os << std::string(depth * 2, ' ') << s->kind_name();
         
         // Print the location of the node.
-        os << ' ' << '@' << s->location();
+        if (Source_range rng = s->location())
+          os << ' ' << '@' << rng;
       }
 
       void end_line(Syntax const* s)

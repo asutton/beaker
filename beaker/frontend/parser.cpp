@@ -1015,7 +1015,6 @@ namespace beaker
       // Value literals
     case Token::true_tok:
     case Token::false_tok:
-    case Token::integer_tok:
     // Type literals
     case Token::int_tok:
     case Token::bool_tok:
